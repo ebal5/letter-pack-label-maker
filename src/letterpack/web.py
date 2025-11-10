@@ -2,11 +2,12 @@
 Webインターフェース (Flask)
 """
 
-from flask import Flask, render_template_string, request, send_file, flash, redirect, url_for
 import os
 import tempfile
-from .label import AddressInfo, create_label
 
+from flask import Flask, flash, redirect, render_template_string, request, send_file, url_for
+
+from .label import AddressInfo, create_label
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -247,17 +248,11 @@ def generate_pdf():
 
         # AddressInfo作成（バリデーション含む）
         to_info = AddressInfo(
-            postal_code=to_postal,
-            address=to_address,
-            name=to_name,
-            phone=to_phone
+            postal_code=to_postal, address=to_address, name=to_name, phone=to_phone
         )
 
         from_info = AddressInfo(
-            postal_code=from_postal,
-            address=from_address,
-            name=from_name,
-            phone=from_phone
+            postal_code=from_postal, address=from_address, name=from_name, phone=from_phone
         )
 
         # 一時ファイルにPDF生成
@@ -271,7 +266,7 @@ def generate_pdf():
             output_path,
             as_attachment=True,
             download_name="letterpack_label.pdf",
-            mimetype="application/pdf"
+            mimetype="application/pdf",
         )
 
     except ValueError as e:
@@ -287,26 +282,13 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="レターパックラベル作成 Webサーバー")
-    parser.add_argument(
-        "--host",
-        default="127.0.0.1",
-        help="ホスト名（デフォルト: 127.0.0.1）"
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=5000,
-        help="ポート番号（デフォルト: 5000）"
-    )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="デバッグモードで起動"
-    )
+    parser.add_argument("--host", default="127.0.0.1", help="ホスト名（デフォルト: 127.0.0.1）")
+    parser.add_argument("--port", type=int, default=5000, help="ポート番号（デフォルト: 5000）")
+    parser.add_argument("--debug", action="store_true", help="デバッグモードで起動")
 
     args = parser.parse_args()
 
-    print(f"Webサーバーを起動中...")
+    print("Webサーバーを起動中...")
     print(f"アクセス: http://{args.host}:{args.port}")
     print("終了するには Ctrl+C を押してください")
 

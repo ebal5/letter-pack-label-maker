@@ -4,7 +4,7 @@
 
 import argparse
 import sys
-from typing import Optional
+
 from .label import AddressInfo, create_label
 
 
@@ -38,18 +38,10 @@ def interactive_input() -> tuple[AddressInfo, AddressInfo, str]:
     if not output:
         output = "label.pdf"
 
-    to_info = AddressInfo(
-        postal_code=to_postal,
-        address=to_address,
-        name=to_name,
-        phone=to_phone
-    )
+    to_info = AddressInfo(postal_code=to_postal, address=to_address, name=to_name, phone=to_phone)
 
     from_info = AddressInfo(
-        postal_code=from_postal,
-        address=from_address,
-        name=from_name,
-        phone=from_phone
+        postal_code=from_postal, address=from_address, name=from_name, phone=from_phone
     )
 
     return to_info, from_info, output
@@ -75,13 +67,11 @@ def main():
     --from-postal "987-6543" \\
     --from-address "大阪府大阪市YYY 4-5-6" \\
     --from-phone "06-9876-5432"
-        """
+        """,
     )
 
     parser.add_argument(
-        "-o", "--output",
-        default="label.pdf",
-        help="出力PDFファイル名（デフォルト: label.pdf）"
+        "-o", "--output", default="label.pdf", help="出力PDFファイル名（デフォルト: label.pdf）"
     )
 
     # お届け先
@@ -116,13 +106,13 @@ def main():
                 postal_code=args.to_postal,
                 address=args.to_address,
                 name=args.to_name,
-                phone=args.to_phone
+                phone=args.to_phone,
             )
             from_info = AddressInfo(
                 postal_code=args.from_postal,
                 address=args.from_address,
                 name=args.from_name,
-                phone=args.from_phone
+                phone=args.from_phone,
             )
             output_path = args.output
 
@@ -138,10 +128,7 @@ def main():
         # PDF生成
         print(f"\nPDFを生成中: {output_path}")
         result_path = create_label(
-            to_address=to_info,
-            from_address=from_info,
-            output_path=output_path,
-            font_path=args.font
+            to_address=to_info, from_address=from_info, output_path=output_path, font_path=args.font
         )
 
         print(f"✓ PDFを生成しました: {result_path}")
@@ -153,6 +140,7 @@ def main():
     except Exception as e:
         print(f"予期しないエラーが発生しました: {e}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         return 1
 

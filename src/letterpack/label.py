@@ -9,6 +9,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 import os
 
 
@@ -52,10 +53,19 @@ class LabelGenerator:
             try:
                 pdfmetrics.registerFont(TTFont("CustomFont", self.font_path))
                 self.font_name = "CustomFont"
+                return
             except Exception as e:
                 print(f"警告: カスタムフォントの読み込みに失敗しました: {e}")
                 print("デフォルトフォントを使用します")
-        # デフォルトフォントは reportlab が内蔵している日本語フォントを使用
+
+        # デフォルトフォント: ReportLabのCJKフォントを登録
+        try:
+            pdfmetrics.registerFont(UnicodeCIDFont('HeiseiKakuGo-W5'))
+            self.font_name = "HeiseiKakuGo-W5"
+        except Exception as e:
+            print(f"警告: HeiseiKakuGo-W5の登録に失敗しました: {e}")
+            # フォールバック: Helvetica（日本語は表示できないが動作する）
+            self.font_name = "Helvetica"
 
     def generate(
         self,

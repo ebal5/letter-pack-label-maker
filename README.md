@@ -59,6 +59,24 @@ uv run python -m letterpack.web
 # ブラウザで http://localhost:5000 を開く
 ```
 
+#### 環境変数の設定
+
+本番環境でWebインターフェースを使用する場合は、セキュリティのために `SECRET_KEY` 環境変数を設定してください：
+
+```bash
+# シークレットキーを生成（例）
+export SECRET_KEY=$(openssl rand -hex 32)
+
+# または .env ファイルを作成
+cp .env.example .env
+# .env ファイルを編集して SECRET_KEY を設定
+
+# Webサーバーを起動
+uv run python -m letterpack.web
+```
+
+開発環境では環境変数が未設定でも動作しますが、警告が表示されます。
+
 ## 必要な情報
 
 - **お届け先**

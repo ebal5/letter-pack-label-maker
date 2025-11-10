@@ -3,6 +3,7 @@ Webインターフェース (Flask)
 """
 
 import os
+import sys
 import tempfile
 
 from flask import Flask, flash, redirect, render_template_string, request, send_file, url_for
@@ -10,7 +11,20 @@ from flask import Flask, flash, redirect, render_template_string, request, send_
 from .label import AddressInfo, create_label
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+
+# 環境変数からシークレットキーを取得
+# 本番環境では必ず SECRET_KEY 環境変数を設定してください
+secret_key = os.environ.get("SECRET_KEY")
+if not secret_key:
+    print(
+        "警告: SECRET_KEY 環境変数が設定されていません。",
+        "開発用のランダムキーを使用します。",
+        "本番環境では必ず SECRET_KEY を設定してください。",
+        file=sys.stderr,
+    )
+    secret_key = os.urandom(24)
+
+app.secret_key = secret_key
 
 
 # HTMLテンプレート

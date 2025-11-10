@@ -1,0 +1,31 @@
+# レターパックラベル作成 - Docker Compose設定
+# 簡単にWebサーバーを起動できる設定ファイル
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      # 本番環境では必ず設定してください
+      # 例: SECRET_KEY=your-secret-key-here
+      - SECRET_KEY=${SECRET_KEY:-development-secret-key}
+    volumes:
+      # 開発時にコード変更をリアルタイム反映（オプション）
+      # 本番環境では削除推奨
+      - ./src:/app/src:ro
+    restart: unless-stopped
+    # ヘルスチェック（コンテナが正常に起動しているか確認）
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+# デフォルトのネットワーク設定
+networks:
+  default:
+    name: letterpack-network

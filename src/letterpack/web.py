@@ -6,7 +6,16 @@ import os
 import sys
 import tempfile
 
-from flask import Flask, flash, redirect, render_template_string, request, send_file, url_for
+from flask import (
+    Flask,
+    after_this_request,
+    flash,
+    redirect,
+    render_template_string,
+    request,
+    send_file,
+    url_for,
+)
 
 from .label import AddressInfo, create_label
 
@@ -274,6 +283,16 @@ def generate_pdf():
             output_path = tmp_file.name
 
         create_label(to_info, from_info, output_path)
+
+        # レスポンス送信後に一時ファイルを削除するコールバックを登録
+        @after_this_request
+        def remove_temp_file(response):
+            try:
+                os.remove(output_path)
+            except Exception as e:
+                # ログに記録するが、エラーを無視してレスポンスは返す
+                print(f"警告: 一時ファイルの削除に失敗: {output_path}, エラー: {e}", file=sys.stderr)
+            return response
 
         # PDFを送信
         return send_file(

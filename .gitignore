@@ -51,6 +51,8 @@ env/
 ENV/
 env.bak/
 venv.bak/
+.venv/
+.python-version
 
 # IDE
 .vscode/

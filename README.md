@@ -16,16 +16,18 @@
 
 ## インストール
 
+このプロジェクトは [uv](https://github.com/astral-sh/uv) を使用して依存関係を管理しています。
+
 ```bash
 # リポジトリをクローン
 git clone https://github.com/yourusername/letter-pack-label-maker.git
 cd letter-pack-label-maker
 
-# 依存関係をインストール
-pip install -r requirements.txt
+# uvで依存関係をインストール
+uv sync
 
-# または開発モードでインストール
-pip install -e .
+# または開発用依存関係も含めてインストール
+uv sync --all-extras
 ```
 
 ## 使い方
@@ -34,10 +36,10 @@ pip install -e .
 
 ```bash
 # 対話形式で入力
-python -m letterpack.cli
+uv run python -m letterpack.cli
 
 # 引数で指定
-python -m letterpack.cli --output label.pdf \
+uv run python -m letterpack.cli --output label.pdf \
   --to-name "山田太郎" \
   --to-postal "123-4567" \
   --to-address "東京都渋谷区XXX 1-2-3" \
@@ -52,7 +54,7 @@ python -m letterpack.cli --output label.pdf \
 
 ```bash
 # Webサーバーを起動
-python -m letterpack.web
+uv run python -m letterpack.web
 
 # ブラウザで http://localhost:5000 を開く
 ```
@@ -83,11 +85,17 @@ MIT License - 詳細は [LICENSE](LICENSE) を参照
 ## 開発
 
 ```bash
-# テストの実行
-pytest
+# 開発用依存関係を含めてインストール
+uv sync --all-extras
 
-# 開発モードでインストール
-pip install -e ".[dev]"
+# テストの実行
+uv run pytest
+
+# コードフォーマット
+uv run black src tests
+
+# リント
+uv run flake8 src tests
 ```
 
 ## 注意事項

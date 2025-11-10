@@ -61,7 +61,7 @@ class LabelGenerator:
 
         # デフォルトフォント: ReportLabのCJKフォントを登録
         try:
-            pdfmetrics.registerFont(UnicodeCIDFont('HeiseiKakuGo-W5'))
+            pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
             self.font_name = "HeiseiKakuGo-W5"
         except Exception as e:
             print(f"警告: HeiseiKakuGo-W5の登録に失敗しました: {e}")

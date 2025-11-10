@@ -2,12 +2,32 @@
 ラベル生成のテスト
 """
 
+import inspect
 import os
+import shutil
 import tempfile
 
 import pytest
 
 from letterpack.label import AddressInfo, LabelGenerator, create_label
+
+
+def save_to_test_output(pdf_path, test_name=None):
+    """
+    CI環境用にPDFを保存するヘルパー関数
+
+    TEST_OUTPUT_DIR環境変数が設定されている場合、
+    生成されたPDFをそのディレクトリにコピーします。
+    """
+    output_dir = os.getenv("TEST_OUTPUT_DIR")
+    if output_dir and os.path.exists(pdf_path):
+        os.makedirs(output_dir, exist_ok=True)
+        if test_name is None:
+            # 呼び出し元の関数名を取得
+            frame = inspect.currentframe().f_back
+            test_name = frame.f_code.co_name
+        dest_path = os.path.join(output_dir, f"{test_name}.pdf")
+        shutil.copy(pdf_path, dest_path)
 
 
 def test_address_info_creation():
@@ -53,6 +73,9 @@ def test_label_generation():
         result = create_label(to_addr, from_addr, output_path)
         assert os.path.exists(result)
         assert os.path.getsize(result) > 0
+
+        # CI環境用にPDFを保存
+        save_to_test_output(result)
     finally:
         if os.path.exists(output_path):
             os.remove(output_path)
@@ -82,6 +105,9 @@ def test_label_generator_class():
     try:
         result = generator.generate(to_addr, from_addr, output_path)
         assert os.path.exists(result)
+
+        # CI環境用にPDFを保存
+        save_to_test_output(result)
     finally:
         if os.path.exists(output_path):
             os.remove(output_path)

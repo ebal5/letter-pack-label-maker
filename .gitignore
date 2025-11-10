@@ -61,6 +61,9 @@ venv.bak/
 *.swo
 *~
 
+# Test output directory (CI-generated PDFs)
+test-output/
+
 # Generated PDFs (for testing)
 *.pdf
 !examples/*.pdf

@@ -32,9 +32,19 @@ jobs:
       with:
         version: "latest"
 
-    # 依存関係のインストール
+    # 依存関係のインストール（dev依存関係も含む）
     - name: Install dependencies
-      run: uv sync
+      run: uv sync --extra dev
+
+    # テスト出力ディレクトリの作成
+    - name: Create test output directory
+      run: mkdir -p test-output
+
+    # pytest実行（テストPDF生成）
+    - name: Run pytest
+      env:
+        TEST_OUTPUT_DIR: test-output
+      run: uv run pytest -v
 
     # テストPDFの生成
     - name: Generate test PDF
@@ -50,11 +60,35 @@ jobs:
           echo "✗ test_label.pdf が見つかりません"
           exit 1
         fi
+        if [ -d test-output ] && [ "$(ls -A test-output/*.pdf 2>/dev/null)" ]; then
+          echo "✓ pytest PDFs が生成されました"
+          ls -lh test-output/*.pdf
+        fi
+
+    # Artifact名を動的に設定（PR番号とコミットSHA含む）
+    - name: Set artifact name
+      id: artifact-name
+      run: |
+        SHORT_SHA=${GITHUB_SHA:0:7}
+        if [ "${{ github.event_name }}" == "pull_request" ]; then
+          echo "name=test-label-pdf-pr-${{ github.event.pull_request.number }}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+        else
+          echo "name=test-label-pdf-main-${SHORT_SHA}" >> $GITHUB_OUTPUT
+        fi
 
     # 生成されたPDFをアーティファクトとしてアップロード
+    # 保持期間: 1日（溜まりすぎないように最短設定）
     - name: Upload PDF artifact
       uses: actions/upload-artifact@v4
       with:
-        name: test-label-pdf
-        path: test_label.pdf
-        retention-days: 30
+        name: ${{ steps.artifact-name.outputs.name }}
+        path: |
+          test_label.pdf
+          test-output/*.pdf
+        retention-days: 1
+        if-no-files-found: warn
+
+    # NOTE: 古いArtifactの自動削除が必要な場合は、以下を参考に別ワークフローを作成
+    # .github/workflows/cleanup-artifacts.yml を作成し、
+    # actions/github-script や geekyeggo/delete-artifact を使用して
+    # 定期的に古いArtifactを削除できます

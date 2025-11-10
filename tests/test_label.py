@@ -2,9 +2,11 @@
 ラベル生成のテスト
 """
 
-import pytest
 import os
 import tempfile
+
+import pytest
+
 from letterpack.label import AddressInfo, LabelGenerator, create_label
 
 
@@ -14,7 +16,7 @@ def test_address_info_creation():
         postal_code="123-4567",
         address="東京都渋谷区XXX 1-2-3",
         name="山田太郎",
-        phone="03-1234-5678"
+        phone="03-1234-5678",
     )
     assert addr.postal_code == "123-4567"
     assert addr.name == "山田太郎"
@@ -35,13 +37,13 @@ def test_label_generation():
         postal_code="123-4567",
         address="東京都渋谷区XXX 1-2-3",
         name="山田太郎",
-        phone="03-1234-5678"
+        phone="03-1234-5678",
     )
     from_addr = AddressInfo(
         postal_code="987-6543",
         address="大阪府大阪市YYY 4-5-6",
         name="田中花子",
-        phone="06-9876-5432"
+        phone="06-9876-5432",
     )
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
@@ -65,13 +67,13 @@ def test_label_generator_class():
         postal_code="100-0001",
         address="東京都千代田区千代田1-1",
         name="テスト太郎",
-        phone="03-0000-0000"
+        phone="03-0000-0000",
     )
     from_addr = AddressInfo(
         postal_code="530-0001",
         address="大阪府大阪市北区梅田1-1",
         name="テスト花子",
-        phone="06-0000-0000"
+        phone="06-0000-0000",
     )
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:

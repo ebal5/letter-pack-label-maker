@@ -6,6 +6,6 @@ Letter Pack Label Maker
 
 __version__ = "0.1.0"
 
-from .label import LabelGenerator, AddressInfo
+from .label import AddressInfo, LabelGenerator
 
 __all__ = ["LabelGenerator", "AddressInfo", "__version__"]

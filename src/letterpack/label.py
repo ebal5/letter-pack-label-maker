@@ -2,14 +2,15 @@
 レターパックラベル生成のコアロジック
 """
 
+import os
 from dataclasses import dataclass
 from typing import Optional
-from reportlab.pdfgen import canvas
+
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-import os
+from reportlab.pdfgen import canvas
 
 
 @dataclass
@@ -57,12 +58,7 @@ class LabelGenerator:
                 print("デフォルトフォントを使用します")
         # デフォルトフォントは reportlab が内蔵している日本語フォントを使用
 
-    def generate(
-        self,
-        to_address: AddressInfo,
-        from_address: AddressInfo,
-        output_path: str
-    ) -> str:
+    def generate(self, to_address: AddressInfo, from_address: AddressInfo, output_path: str) -> str:
         """
         ラベルPDFを生成
 
@@ -96,10 +92,7 @@ class LabelGenerator:
 
         # 区切り線
         c.line(
-            x_offset,
-            y_offset + section_height,
-            x_offset + label_width,
-            y_offset + section_height
+            x_offset, y_offset + section_height, x_offset + label_width, y_offset + section_height
         )
 
         # お届け先（上半分）
@@ -110,18 +103,12 @@ class LabelGenerator:
             y_offset + section_height,
             label_width,
             section_height,
-            "お届け先"
+            "お届け先",
         )
 
         # ご依頼主（下半分）
         self._draw_address_section(
-            c,
-            from_address,
-            x_offset,
-            y_offset,
-            label_width,
-            section_height,
-            "ご依頼主"
+            c, from_address, x_offset, y_offset, label_width, section_height, "ご依頼主"
         )
 
         c.save()
@@ -135,7 +122,7 @@ class LabelGenerator:
         y: float,
         width: float,
         height: float,
-        label: str
+        label: str,
     ):
         """
         住所セクションを描画
@@ -176,11 +163,7 @@ class LabelGenerator:
         # 電話番号（右下）
         c.setFont(self.font_name, 10)
         c.setFillColorRGB(0.3, 0.3, 0.3)
-        c.drawRightString(
-            x + width - margin,
-            y + margin,
-            f"TEL: {address.phone}"
-        )
+        c.drawRightString(x + width - margin, y + margin, f"TEL: {address.phone}")
 
     def _split_address(self, address: str, max_length: int = 30) -> list[str]:
         """
@@ -216,7 +199,7 @@ def create_label(
     to_address: AddressInfo,
     from_address: AddressInfo,
     output_path: str = "label.pdf",
-    font_path: Optional[str] = None
+    font_path: Optional[str] = None,
 ) -> str:
     """
     ラベルPDFを生成する便利関数

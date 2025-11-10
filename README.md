@@ -82,6 +82,37 @@ MIT License - 詳細は [LICENSE](LICENSE) を参照
 - [ReportLab](https://www.reportlab.com/) (BSD License) - PDF生成
 - [Flask](https://flask.palletsprojects.com/) (BSD License) - Webインターフェース
 
+## ラベル配置調整ツール
+
+レターパックラベルのレイアウト（マージン、フォントサイズ、要素間隔など）を視覚的に調整できるツールが用意されています。
+
+### 使い方
+
+```bash
+# 調整ツールを起動
+uv run python tools/label_adjuster.py
+
+# ブラウザで http://localhost:8080 を開く
+```
+
+### 機能
+
+- **リアルタイムプレビュー**: レイアウトパラメータを変更すると、即座にPDFプレビューが更新されます
+- **設定の保存**: 調整した設定を `config/label_layout.yaml` に保存できます
+- **テストデータ**: あらかじめ用意されたテストデータで動作確認できます
+
+### オプション
+
+```bash
+# ポート番号を指定
+uv run python tools/label_adjuster.py --port 8000
+
+# ホストを指定
+uv run python tools/label_adjuster.py --host 0.0.0.0 --port 8080
+```
+
+**注意**: このツールはローカル開発環境での使用を想定しています。外部ネットワークに公開しないでください。
+
 ## 開発
 
 ```bash
@@ -91,11 +122,11 @@ uv sync --all-extras
 # テストの実行
 uv run pytest
 
-# コードフォーマット
-uv run black src tests
+# コードチェックと自動修正
+uv run ruff check --fix src tests
 
-# リント
-uv run flake8 src tests
+# コードフォーマット
+uv run ruff format src tests
 ```
 
 ## 注意事項

@@ -1,0 +1,32 @@
+# レターパックラベルのレイアウト設定
+# 単位: mm はミリメートル、pt はポイント、px はピクセル
+
+# ラベルの基本寸法
+layout:
+  label_width: 148  # mm - A5サイズの幅
+  label_height: 210  # mm - A5サイズの高さ
+  x_offset: auto  # auto = A4の中央に配置
+  y_offset: auto  # auto = A4の中央に配置
+  margin: 5  # mm - セクション内のマージン
+  draw_border: true  # デバッグ用の枠線を描画するか
+
+# フォントサイズ
+fonts:
+  section_label: 10  # pt - "お届け先" / "ご依頼主" ラベル
+  postal_code: 12  # pt - 郵便番号
+  address: 11  # pt - 住所
+  name: 14  # pt - 氏名
+  phone: 10  # pt - 電話番号
+
+# 要素間のスペーシング
+spacing:
+  section_label_offset: 10  # px - セクションラベルからの距離
+  postal_offset: 30  # px - セクションラベルから郵便番号までの距離
+  address_offset: 20  # px - 郵便番号から住所までの距離
+  address_line_height: 18  # px - 住所の行間
+  name_offset: 10  # px - 住所から氏名までの距離
+  phone_margin: 5  # mm - 電話番号の下マージン
+
+# 住所の折り返し設定
+address:
+  max_length: 30  # 1行の最大文字数

@@ -4,8 +4,11 @@
 
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Optional
 
+import yaml
+from pydantic import BaseModel, Field
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
@@ -35,16 +38,159 @@ class AddressInfo:
             raise ValueError("電話番号は必須です")
 
 
+# レイアウト設定のPydanticモデル
+
+
+class LayoutConfig(BaseModel):
+    """ラベルの基本寸法設定"""
+
+    label_width: float = Field(default=148, gt=0, le=300, description="ラベルの幅 (mm)")
+    label_height: float = Field(default=210, gt=0, le=500, description="ラベルの高さ (mm)")
+    margin: float = Field(default=8, ge=0, le=50, description="セクション内のマージン (mm)")
+    draw_border: bool = Field(default=True, description="デバッグ用の枠線を描画するか")
+
+
+class FontsConfig(BaseModel):
+    """フォントサイズ設定"""
+
+    label: int = Field(default=9, gt=0, le=72, description="フィールドラベルのフォントサイズ (pt)")
+    postal_code: int = Field(default=10, gt=0, le=72, description="郵便番号のフォントサイズ (pt)")
+    address: int = Field(default=11, gt=0, le=72, description="住所のフォントサイズ (pt)")
+    name: int = Field(default=14, gt=0, le=72, description="氏名のフォントサイズ (pt)")
+    phone: int = Field(default=11, gt=0, le=72, description="電話番号のフォントサイズ (pt)")
+
+
+class SpacingConfig(BaseModel):
+    """要素間のスペーシング設定"""
+
+    section_spacing: int = Field(default=15, ge=0, le=100, description="セクション間の間隔 (px)")
+    address_line_height: int = Field(default=12, ge=0, le=100, description="住所の行間 (px)")
+    address_name_gap: int = Field(
+        default=8, ge=0, le=100, description="住所と名前セクションの間隔 (px)"
+    )
+    name_phone_gap: int = Field(
+        default=18, ge=0, le=100, description="名前と電話番号セクションの間隔 (px)"
+    )
+    postal_box_offset_x: int = Field(
+        default=15, ge=-100, le=100, description="郵便番号ボックスのX軸オフセット (px)"
+    )
+    postal_box_offset_y: int = Field(
+        default=-5, ge=-100, le=100, description="郵便番号ボックスのY軸オフセット (px)"
+    )
+    dotted_line_text_offset: int = Field(
+        default=2, ge=0, le=50, description="点線からテキストまでのオフセット (px)"
+    )
+
+
+class PostalBoxConfig(BaseModel):
+    """郵便番号ボックス設定"""
+
+    box_size: float = Field(default=5, gt=0, le=20, description="ボックスのサイズ (mm)")
+    box_spacing: float = Field(default=1, ge=0, le=10, description="ボックス間の間隔 (mm)")
+
+
+class AddressLayoutConfig(BaseModel):
+    """住所レイアウト設定"""
+
+    max_length: int = Field(default=35, gt=0, le=100, description="1行の最大文字数")
+    max_lines: int = Field(default=3, gt=0, le=10, description="最大行数")
+
+
+class DottedLineConfig(BaseModel):
+    """点線スタイル設定"""
+
+    dash_length: float = Field(default=2, gt=0, le=10, description="線の長さ (mm)")
+    dash_spacing: float = Field(default=2, gt=0, le=10, description="線の間隔 (mm)")
+    color_r: float = Field(default=0.5, ge=0, le=1, description="RGB の R 値")
+    color_g: float = Field(default=0.5, ge=0, le=1, description="RGB の G 値")
+    color_b: float = Field(default=0.5, ge=0, le=1, description="RGB の B 値")
+
+
+class SamaConfig(BaseModel):
+    """「様」の配置設定"""
+
+    width: float = Field(default=8, gt=0, le=50, description="「様」用のスペース (mm)")
+    offset: float = Field(default=2, ge=0, le=20, description="点線からのオフセット (mm)")
+
+
+class BorderConfig(BaseModel):
+    """枠線スタイル設定（デバッグ用）"""
+
+    color_r: float = Field(default=0.8, ge=0, le=1, description="RGB の R 値")
+    color_g: float = Field(default=0.8, ge=0, le=1, description="RGB の G 値")
+    color_b: float = Field(default=0.8, ge=0, le=1, description="RGB の B 値")
+    line_width: float = Field(default=0.5, gt=0, le=10, description="線の幅")
+
+
+class PhoneConfig(BaseModel):
+    """電話番号の配置設定"""
+
+    offset_x: int = Field(default=30, ge=0, le=200, description="電話番号の左からのオフセット (px)")
+
+
+class LabelLayoutConfig(BaseModel):
+    """レターパックラベルのレイアウト全体設定"""
+
+    layout: LayoutConfig = Field(default_factory=LayoutConfig)
+    fonts: FontsConfig = Field(default_factory=FontsConfig)
+    spacing: SpacingConfig = Field(default_factory=SpacingConfig)
+    postal_box: PostalBoxConfig = Field(default_factory=PostalBoxConfig)
+    address: AddressLayoutConfig = Field(default_factory=AddressLayoutConfig)
+    dotted_line: DottedLineConfig = Field(default_factory=DottedLineConfig)
+    sama: SamaConfig = Field(default_factory=SamaConfig)
+    border: BorderConfig = Field(default_factory=BorderConfig)
+    phone: PhoneConfig = Field(default_factory=PhoneConfig)
+
+
+def load_layout_config(config_path: Optional[str] = None) -> LabelLayoutConfig:
+    """
+    レイアウト設定をYAMLファイルから読み込む
+
+    Args:
+        config_path: 設定ファイルのパス（Noneの場合はデフォルト設定を使用）
+
+    Returns:
+        LabelLayoutConfig: レイアウト設定
+
+    Raises:
+        FileNotFoundError: 設定ファイルが見つからない場合
+        ValueError: 設定ファイルの形式が不正な場合
+    """
+    if config_path is None:
+        # デフォルト設定を使用
+        return LabelLayoutConfig()
+
+    config_file = Path(config_path)
+    if not config_file.exists():
+        raise FileNotFoundError(f"設定ファイルが見つかりません: {config_path}")
+
+    try:
+        with open(config_file, encoding="utf-8") as f:
+            config_data = yaml.safe_load(f)
+
+        if config_data is None:
+            # 空のYAMLファイルの場合はデフォルト設定を使用
+            return LabelLayoutConfig()
+
+        return LabelLayoutConfig(**config_data)
+    except yaml.YAMLError as e:
+        raise ValueError(f"YAML形式が不正です: {e}") from e
+    except Exception as e:
+        raise ValueError(f"設定ファイルの読み込みに失敗しました: {e}") from e
+
+
 class LabelGenerator:
     """レターパックラベルPDF生成クラス"""
 
-    def __init__(self, font_path: Optional[str] = None):
+    def __init__(self, font_path: Optional[str] = None, config_path: Optional[str] = None):
         """
         Args:
             font_path: 日本語フォントのパス（Noneの場合はシステムフォントを試行）
+            config_path: レイアウト設定ファイルのパス（Noneの場合はデフォルト設定を使用）
         """
         self.font_name = "IPAGothic"  # デフォルトフォント（_setup_fontで設定される）
         self.font_path = font_path
+        self.config = load_layout_config(config_path)
         self._setup_font()
 
     def _setup_font(self):
@@ -114,19 +260,23 @@ class LabelGenerator:
         c = canvas.Canvas(output_path, pagesize=A4)
         width, height = A4
 
-        # A5サイズのラベルをA4の中央に配置
-        # A5 = 148mm x 210mm
-        label_width = 148 * mm
-        label_height = 210 * mm
+        # 設定からラベルサイズを取得
+        label_width = self.config.layout.label_width * mm
+        label_height = self.config.layout.label_height * mm
 
         # 中央配置のためのオフセット計算
         x_offset = (width - label_width) / 2
         y_offset = (height - label_height) / 2
 
-        # 枠線（デバッグ用 - 本番では不要かもしれません）
-        c.setStrokeColorRGB(0.8, 0.8, 0.8)
-        c.setLineWidth(0.5)
-        c.rect(x_offset, y_offset, label_width, label_height)
+        # 枠線（デバッグ用）
+        if self.config.layout.draw_border:
+            c.setStrokeColorRGB(
+                self.config.border.color_r,
+                self.config.border.color_g,
+                self.config.border.color_b,
+            )
+            c.setLineWidth(self.config.border.line_width)
+            c.rect(x_offset, y_offset, label_width, label_height)
 
         # ラベルを上下2分割（お届け先が上、ご依頼主が下）
         section_height = label_height / 2
@@ -167,9 +317,10 @@ class LabelGenerator:
         # ハイフンを除去して数字のみ抽出
         digits = postal_code.replace("-", "").replace("〒", "").strip()
 
-        # ボックスのサイズ
-        box_size = 5 * mm
-        box_spacing = 1 * mm
+        # 設定からボックスのサイズを取得
+        box_size = self.config.postal_box.box_size * mm
+        box_spacing = self.config.postal_box.box_spacing * mm
+        postal_font_size = self.config.fonts.postal_code
 
         # 7つのボックスを描画
         for i in range(7):
@@ -179,11 +330,11 @@ class LabelGenerator:
 
             # 数字を中央に描画
             if i < len(digits):
-                c.setFont(self.font_name, 10)
+                c.setFont(self.font_name, postal_font_size)
                 # 文字を中央揃え
-                text_width = c.stringWidth(digits[i], self.font_name, 10)
+                text_width = c.stringWidth(digits[i], self.font_name, postal_font_size)
                 text_x = box_x + (box_size - text_width) / 2
-                text_y = y + (box_size - 10) / 2
+                text_y = y + (box_size - postal_font_size) / 2
                 c.drawString(text_x, text_y, digits[i])
 
     def _draw_dotted_line(self, c: canvas.Canvas, x1: float, y: float, x2: float):
@@ -196,8 +347,13 @@ class LabelGenerator:
             y: y座標
             x2: 終了x座標
         """
-        c.setDash(2, 2)  # 点線パターン（2mm線、2mm空白）
-        c.setStrokeColorRGB(0.5, 0.5, 0.5)
+        # 設定から点線スタイルを取得
+        c.setDash(self.config.dotted_line.dash_length, self.config.dotted_line.dash_spacing)
+        c.setStrokeColorRGB(
+            self.config.dotted_line.color_r,
+            self.config.dotted_line.color_g,
+            self.config.dotted_line.color_b,
+        )
         c.line(x1, y, x2, y)
         c.setDash()  # 点線をリセット（実線に戻す）
         c.setStrokeColorRGB(0, 0, 0)  # 線の色を黒に戻す
@@ -222,11 +378,22 @@ class LabelGenerator:
             width, height: セクションのサイズ
             label: セクションラベル（"お届け先" or "ご依頼主"）
         """
-        margin = 8 * mm
+        # 設定から値を取得
+        margin = self.config.layout.margin * mm
         current_y = y + height - margin
 
-        # フィールドラベルのフォントサイズ
-        label_font_size = 9
+        label_font_size = self.config.fonts.label
+        address_font_size = self.config.fonts.address
+        name_font_size = self.config.fonts.name
+        phone_font_size = self.config.fonts.phone
+
+        section_spacing = self.config.spacing.section_spacing
+        address_line_height = self.config.spacing.address_line_height
+        address_name_gap = self.config.spacing.address_name_gap
+        name_phone_gap = self.config.spacing.name_phone_gap
+        postal_box_offset_x = self.config.spacing.postal_box_offset_x
+        postal_box_offset_y = self.config.spacing.postal_box_offset_y
+        dotted_line_text_offset = self.config.spacing.dotted_line_text_offset
 
         # おところ: / Address
         c.setFont(self.font_name, label_font_size)
@@ -235,36 +402,38 @@ class LabelGenerator:
         c.setFont("Helvetica", label_font_size)
         c.drawString(x + margin + 35, current_y, "Address")
 
-        current_y -= 15
+        current_y -= section_spacing
 
         # 郵便番号ボックス
-        c.setFont(self.font_name, 10)
+        c.setFont(self.font_name, self.config.fonts.postal_code)
         c.setFillColorRGB(0, 0, 0)
-        self._draw_postal_boxes(c, address.postal_code, x + margin + 15, current_y - 5)
+        self._draw_postal_boxes(
+            c,
+            address.postal_code,
+            x + margin + postal_box_offset_x,
+            current_y + postal_box_offset_y,
+        )
 
-        current_y -= 15
+        current_y -= section_spacing
 
         # 住所記入エリア（複数行の点線）
-        address_lines = self._split_address(address.address, max_length=35)
-        for i, line in enumerate(address_lines[:3]):  # 最大3行
-            if i == 0:
-                # 1行目は少し上に
-                self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
-                c.setFont(self.font_name, 11)
-                c.drawString(x + margin + 2, current_y + 2, line)
-                current_y -= 12
-            else:
-                self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
-                c.setFont(self.font_name, 11)
-                c.drawString(x + margin + 2, current_y + 2, line)
-                current_y -= 12
+        address_lines = self._split_address(
+            address.address, max_length=self.config.address.max_length
+        )
+        for line in address_lines[: self.config.address.max_lines]:
+            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+            c.setFont(self.font_name, address_font_size)
+            c.drawString(
+                x + margin + dotted_line_text_offset, current_y + dotted_line_text_offset, line
+            )
+            current_y -= address_line_height
 
         # 追加の点線（空欄）
-        for _ in range(3 - len(address_lines)):
+        for _ in range(self.config.address.max_lines - len(address_lines)):
             self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
-            current_y -= 12
+            current_y -= address_line_height
 
-        current_y -= 8
+        current_y -= address_name_gap
 
         # おなまえ: / Name
         c.setFont(self.font_name, label_font_size)
@@ -273,25 +442,27 @@ class LabelGenerator:
         c.setFont("Helvetica", label_font_size)
         c.drawString(x + margin + 40, current_y, "Name")
 
-        current_y -= 15
+        current_y -= section_spacing
 
         # 名前記入エリア（点線を短くして「様」のスペースを確保）
-        sama_width = 8 * mm  # 「様」用のスペース
+        sama_width = self.config.sama.width * mm
         name_line_end = x + width - margin - sama_width
         self._draw_dotted_line(c, x + margin, current_y, name_line_end)
 
         # 名前を描画
-        c.setFont(self.font_name, 14)
+        c.setFont(self.font_name, name_font_size)
         c.setFillColorRGB(0, 0, 0)
-        c.drawString(x + margin + 2, current_y + 2, address.name)
+        c.drawString(
+            x + margin + dotted_line_text_offset, current_y + dotted_line_text_offset, address.name
+        )
 
         # 「様」を点線の右側に表示
-        c.setFont(self.font_name, 14)
+        c.setFont(self.font_name, name_font_size)
         c.setFillColorRGB(0, 0, 0)
-        sama_x = name_line_end + 2 * mm  # 点線の終点から2mm右
-        c.drawString(sama_x, current_y + 2, "様")
+        sama_x = name_line_end + self.config.sama.offset * mm
+        c.drawString(sama_x, current_y + dotted_line_text_offset, "様")
 
-        current_y -= 18
+        current_y -= name_phone_gap
 
         # 電話番号: / Telephone Number
         c.setFont(self.font_name, label_font_size)
@@ -300,13 +471,13 @@ class LabelGenerator:
         c.setFont("Helvetica", label_font_size)
         c.drawString(x + margin + 42, current_y, "Telephone Number")
 
-        current_y -= 15
+        current_y -= section_spacing
 
         # 電話番号記入エリア（括弧付き）
-        c.setFont(self.font_name, 11)
+        c.setFont(self.font_name, phone_font_size)
         c.setFillColorRGB(0, 0, 0)
         phone_text = f"( {address.phone} )"
-        c.drawString(x + margin + 30, current_y, phone_text)
+        c.drawString(x + margin + self.config.phone.offset_x, current_y, phone_text)
 
     def _split_address(self, address: str, max_length: int = 30) -> list[str]:
         """
@@ -343,6 +514,7 @@ def create_label(
     from_address: AddressInfo,
     output_path: str = "label.pdf",
     font_path: Optional[str] = None,
+    config_path: Optional[str] = None,
 ) -> str:
     """
     ラベルPDFを生成する便利関数
@@ -352,9 +524,10 @@ def create_label(
         from_address: ご依頼主情報
         output_path: 出力PDFファイルパス
         font_path: 日本語フォントのパス
+        config_path: レイアウト設定ファイルのパス（Noneの場合はデフォルト設定を使用）
 
     Returns:
         生成されたPDFファイルのパス
     """
-    generator = LabelGenerator(font_path=font_path)
+    generator = LabelGenerator(font_path=font_path, config_path=config_path)
     return generator.generate(to_address, from_address, output_path)

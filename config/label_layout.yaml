@@ -1,0 +1,61 @@
+# レターパックラベルのレイアウト設定
+# このファイルでレイアウトパラメータをカスタマイズできます
+
+# ラベルの基本寸法（mm単位）
+layout:
+  label_width: 148  # A5サイズの幅
+  label_height: 210  # A5サイズの高さ
+  margin: 8  # セクション内のマージン
+  draw_border: true  # デバッグ用の枠線を描画するか
+
+# フォントサイズ（pt単位）
+fonts:
+  label: 9  # フィールドラベル（おところ、おなまえ等）
+  postal_code: 10  # 郵便番号
+  address: 11  # 住所
+  name: 14  # 氏名
+  phone: 11  # 電話番号
+
+# 要素間のスペーシング（px単位）
+spacing:
+  section_spacing: 15  # セクション間の間隔（おところ→郵便番号、おなまえ→名前など）
+  address_line_height: 12  # 住所の行間
+  address_name_gap: 8  # 住所と名前セクションの間隔
+  name_phone_gap: 18  # 名前と電話番号セクションの間隔
+  postal_box_offset_x: 15  # 郵便番号ボックスの左からのオフセット
+  postal_box_offset_y: -5  # 郵便番号ボックスの上からのオフセット
+  dotted_line_text_offset: 2  # 点線からテキストまでのオフセット
+
+# 郵便番号ボックス（mm単位）
+postal_box:
+  box_size: 5  # 1つのボックスのサイズ
+  box_spacing: 1  # ボックス間の間隔
+
+# 住所設定
+address:
+  max_length: 35  # 1行の最大文字数
+  max_lines: 3  # 最大行数
+
+# 点線スタイル
+dotted_line:
+  dash_length: 2  # 線の長さ（mm）
+  dash_spacing: 2  # 線の間隔（mm）
+  color_r: 0.5  # RGB の R 値（0.0-1.0）
+  color_g: 0.5  # RGB の G 値（0.0-1.0）
+  color_b: 0.5  # RGB の B 値（0.0-1.0）
+
+# 「様」の配置（mm単位）
+sama:
+  width: 8  # 「様」用のスペース
+  offset: 2  # 点線からのオフセット
+
+# 枠線スタイル（デバッグ用）
+border:
+  color_r: 0.8  # RGB の R 値（0.0-1.0）
+  color_g: 0.8  # RGB の G 値（0.0-1.0）
+  color_b: 0.8  # RGB の B 値（0.0-1.0）
+  line_width: 0.5  # 線の幅
+
+# 電話番号の配置
+phone:
+  offset_x: 30  # 電話番号テキストの左からのオフセット

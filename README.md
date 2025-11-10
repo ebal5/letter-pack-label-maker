@@ -77,6 +77,22 @@ uv run python -m letterpack.web
 
 開発環境では環境変数が未設定でも動作しますが、警告が表示されます。
 
+### Docker環境での実行（推奨）
+
+フォント環境を統一し、どの環境でも一貫したPDF出力を得るために、Docker環境の使用を推奨します。
+
+```bash
+# Docker Composeで起動
+docker compose up
+
+# バックグラウンドで起動
+docker compose up -d
+
+# ブラウザで http://localhost:5000 を開く
+```
+
+詳細は [DOCKER.md](DOCKER.md) を参照してください。
+
 ## 必要な情報
 
 - **お届け先**
@@ -109,12 +125,12 @@ uv sync --all-extras
 # テストの実行
 uv run pytest
 
-# コードフォーマット
-uv run black src tests
-
-# リント
-uv run flake8 src tests
+# コードフォーマットとリント（Ruff使用）
+uv run ruff format src tests
+uv run ruff check --fix src tests
 ```
+
+詳細なガイドラインは [AGENTS.md](AGENTS.md) および [CLAUDE.md](CLAUDE.md) を参照してください。
 
 ## 注意事項
 

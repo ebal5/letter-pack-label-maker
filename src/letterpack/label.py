@@ -43,7 +43,7 @@ class LabelGenerator:
         Args:
             font_path: 日本語フォントのパス（Noneの場合はシステムフォントを試行）
         """
-        self.font_name = "HeiseiKakuGo-W5"  # デフォルトフォント
+        self.font_name = "IPAGothic"  # デフォルトフォント（_setup_fontで設定される）
         self.font_path = font_path
         self._setup_font()
 
@@ -59,14 +59,45 @@ class LabelGenerator:
                 print(f"警告: カスタムフォントの読み込みに失敗しました: {e}")
                 print("デフォルトフォントを使用します")
 
-        # デフォルトフォント: ReportLabのCJKフォントを登録
+        # デフォルトフォント: IPAフォント（完全な日本語サポート）
+        # システムにインストールされている日本語フォントを探す
+        ipa_font_paths = [
+            "/usr/share/fonts/opentype/ipafont-gothic/ipag.ttf",
+            "/usr/share/fonts/truetype/fonts-japanese-gothic.ttf",
+            "/usr/share/fonts/truetype/ipafont/ipag.ttf",
+        ]
+
+        for font_path in ipa_font_paths:
+            if os.path.exists(font_path):
+                try:
+                    pdfmetrics.registerFont(TTFont("IPAGothic", font_path))
+                    self.font_name = "IPAGothic"
+                    return
+                except Exception as e:
+                    print(f"警告: IPAGothic ({font_path}) の登録に失敗しました: {e}")
+                    continue
+
+        # フォールバック: ReportLabのCJKフォント
         try:
-            pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
-            self.font_name = "HeiseiKakuGo-W5"
+            pdfmetrics.registerFont(UnicodeCIDFont("HeiseiMin-W3"))
+            self.font_name = "HeiseiMin-W3"
+            print(
+                "警告: IPAフォントが見つかりません。HeiseiMin-W3を使用します（一部の文字が表示されない可能性があります）"
+            )
         except Exception as e:
-            print(f"警告: HeiseiKakuGo-W5の登録に失敗しました: {e}")
-            # フォールバック: Helvetica（日本語は表示できないが動作する）
-            self.font_name = "Helvetica"
+            print(f"警告: HeiseiMin-W3の登録に失敗しました: {e}")
+            # 最終フォールバック: HeiseiKakuGo-W5を試す
+            try:
+                pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
+                self.font_name = "HeiseiKakuGo-W5"
+                print(
+                    "警告: HeiseiKakuGo-W5を使用します（一部の文字が表示されない可能性があります）"
+                )
+            except Exception as e2:
+                print(f"警告: HeiseiKakuGo-W5の登録にも失敗しました: {e2}")
+                # 最終フォールバック: Helvetica（日本語は表示できないが動作する）
+                self.font_name = "Helvetica"
+                print("警告: 日本語フォントが利用できません。Helveticaを使用します")
 
     def generate(self, to_address: AddressInfo, from_address: AddressInfo, output_path: str) -> str:
         """
@@ -124,6 +155,53 @@ class LabelGenerator:
         c.save()
         return output_path
 
+    def _draw_postal_boxes(self, c: canvas.Canvas, postal_code: str, x: float, y: float):
+        """
+        郵便番号を7つのボックスで描画
+
+        Args:
+            c: Canvas オブジェクト
+            postal_code: 郵便番号（例: "123-4567"）
+            x, y: 開始座標
+        """
+        # ハイフンを除去して数字のみ抽出
+        digits = postal_code.replace("-", "").replace("〒", "").strip()
+
+        # ボックスのサイズ
+        box_size = 5 * mm
+        box_spacing = 1 * mm
+
+        # 7つのボックスを描画
+        for i in range(7):
+            box_x = x + i * (box_size + box_spacing)
+            # ボックスの枠
+            c.rect(box_x, y, box_size, box_size)
+
+            # 数字を中央に描画
+            if i < len(digits):
+                c.setFont(self.font_name, 10)
+                # 文字を中央揃え
+                text_width = c.stringWidth(digits[i], self.font_name, 10)
+                text_x = box_x + (box_size - text_width) / 2
+                text_y = y + (box_size - 10) / 2
+                c.drawString(text_x, text_y, digits[i])
+
+    def _draw_dotted_line(self, c: canvas.Canvas, x1: float, y: float, x2: float):
+        """
+        点線を描画
+
+        Args:
+            c: Canvas オブジェクト
+            x1: 開始x座標
+            y: y座標
+            x2: 終了x座標
+        """
+        c.setDash(2, 2)  # 点線パターン（2mm線、2mm空白）
+        c.setStrokeColorRGB(0.5, 0.5, 0.5)
+        c.line(x1, y, x2, y)
+        c.setDash()  # 点線をリセット（実線に戻す）
+        c.setStrokeColorRGB(0, 0, 0)  # 線の色を黒に戻す
+
     def _draw_address_section(
         self,
         c: canvas.Canvas,
@@ -144,36 +222,91 @@ class LabelGenerator:
             width, height: セクションのサイズ
             label: セクションラベル（"お届け先" or "ご依頼主"）
         """
-        margin = 5 * mm
+        margin = 8 * mm
+        current_y = y + height - margin
 
-        # セクションラベル
-        c.setFont(self.font_name, 10)
-        c.setFillColorRGB(0.3, 0.3, 0.3)
-        c.drawString(x + margin, y + height - margin - 10, label)
+        # フィールドラベルのフォントサイズ
+        label_font_size = 9
 
-        # 郵便番号
-        c.setFont(self.font_name, 12)
+        # おところ: / Address
+        c.setFont(self.font_name, label_font_size)
         c.setFillColorRGB(0, 0, 0)
-        postal_y = y + height - margin - 30
-        c.drawString(x + margin, postal_y, f"〒 {address.postal_code}")
+        c.drawString(x + margin, current_y, "おところ:")
+        c.setFont("Helvetica", label_font_size)
+        c.drawString(x + margin + 35, current_y, "Address")
 
-        # 住所（複数行対応）
-        address_lines = self._split_address(address.address)
-        address_y = postal_y - 20
-        c.setFont(self.font_name, 11)
-        for line in address_lines:
-            c.drawString(x + margin, address_y, line)
-            address_y -= 18
+        current_y -= 15
 
-        # 氏名
-        name_y = address_y - 10
-        c.setFont(self.font_name, 14)
-        c.drawString(x + margin, name_y, address.name)
-
-        # 電話番号（右下）
+        # 郵便番号ボックス
         c.setFont(self.font_name, 10)
-        c.setFillColorRGB(0.3, 0.3, 0.3)
-        c.drawRightString(x + width - margin, y + margin, f"TEL: {address.phone}")
+        c.setFillColorRGB(0, 0, 0)
+        self._draw_postal_boxes(c, address.postal_code, x + margin + 15, current_y - 5)
+
+        current_y -= 15
+
+        # 住所記入エリア（複数行の点線）
+        address_lines = self._split_address(address.address, max_length=35)
+        for i, line in enumerate(address_lines[:3]):  # 最大3行
+            if i == 0:
+                # 1行目は少し上に
+                self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+                c.setFont(self.font_name, 11)
+                c.drawString(x + margin + 2, current_y + 2, line)
+                current_y -= 12
+            else:
+                self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+                c.setFont(self.font_name, 11)
+                c.drawString(x + margin + 2, current_y + 2, line)
+                current_y -= 12
+
+        # 追加の点線（空欄）
+        for _ in range(3 - len(address_lines)):
+            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+            current_y -= 12
+
+        current_y -= 8
+
+        # おなまえ: / Name
+        c.setFont(self.font_name, label_font_size)
+        c.setFillColorRGB(0, 0, 0)
+        c.drawString(x + margin, current_y, "おなまえ:")
+        c.setFont("Helvetica", label_font_size)
+        c.drawString(x + margin + 40, current_y, "Name")
+
+        current_y -= 15
+
+        # 名前記入エリア（点線を短くして「様」のスペースを確保）
+        sama_width = 8 * mm  # 「様」用のスペース
+        name_line_end = x + width - margin - sama_width
+        self._draw_dotted_line(c, x + margin, current_y, name_line_end)
+
+        # 名前を描画
+        c.setFont(self.font_name, 14)
+        c.setFillColorRGB(0, 0, 0)
+        c.drawString(x + margin + 2, current_y + 2, address.name)
+
+        # 「様」を点線の右側に表示
+        c.setFont(self.font_name, 14)
+        c.setFillColorRGB(0, 0, 0)
+        sama_x = name_line_end + 2 * mm  # 点線の終点から2mm右
+        c.drawString(sama_x, current_y + 2, "様")
+
+        current_y -= 18
+
+        # 電話番号: / Telephone Number
+        c.setFont(self.font_name, label_font_size)
+        c.setFillColorRGB(0, 0, 0)
+        c.drawString(x + margin, current_y, "電話番号:")
+        c.setFont("Helvetica", label_font_size)
+        c.drawString(x + margin + 42, current_y, "Telephone Number")
+
+        current_y -= 15
+
+        # 電話番号記入エリア（括弧付き）
+        c.setFont(self.font_name, 11)
+        c.setFillColorRGB(0, 0, 0)
+        phone_text = f"( {address.phone} )"
+        c.drawString(x + margin + 30, current_y, phone_text)
 
     def _split_address(self, address: str, max_length: int = 30) -> list[str]:
         """

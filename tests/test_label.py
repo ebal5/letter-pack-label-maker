@@ -8,8 +8,10 @@ import shutil
 import tempfile
 
 import pytest
+import yaml
+from pydantic import ValidationError
 
-from letterpack.label import AddressInfo, LabelGenerator, create_label
+from letterpack.label import AddressInfo, LabelGenerator, create_label, load_layout_config
 
 
 def save_to_test_output(pdf_path, test_name=None):
@@ -111,3 +113,144 @@ def test_label_generator_class():
     finally:
         if os.path.exists(output_path):
             os.remove(output_path)
+
+
+# 設定関連のテスト
+
+
+def test_load_default_config():
+    """デフォルト設定の読み込みテスト"""
+    config = load_layout_config(None)
+    assert config is not None
+    assert config.layout.label_width == 148
+    assert config.layout.label_height == 210
+    assert config.layout.margin == 8
+    assert config.fonts.label == 9
+    assert config.fonts.postal_code == 10
+    assert config.fonts.address == 11
+    assert config.fonts.name == 14
+    assert config.fonts.phone == 11
+
+
+def test_load_custom_config():
+    """カスタム設定の読み込みテスト"""
+    # 一時的な設定ファイルを作成
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_file:
+        config_data = {
+            "layout": {"label_width": 150, "label_height": 220, "margin": 10},
+            "fonts": {"label": 10, "postal_code": 12, "address": 12, "name": 16, "phone": 12},
+        }
+        yaml.dump(config_data, tmp_file)
+        config_path = tmp_file.name
+
+    try:
+        config = load_layout_config(config_path)
+        assert config.layout.label_width == 150
+        assert config.layout.label_height == 220
+        assert config.layout.margin == 10
+        assert config.fonts.label == 10
+        assert config.fonts.postal_code == 12
+    finally:
+        if os.path.exists(config_path):
+            os.remove(config_path)
+
+
+def test_load_config_file_not_found():
+    """存在しない設定ファイルのテスト"""
+    with pytest.raises(FileNotFoundError):
+        load_layout_config("/nonexistent/config.yaml")
+
+
+def test_load_empty_config():
+    """空の設定ファイルのテスト"""
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_file:
+        tmp_file.write("")  # 空のファイル
+        config_path = tmp_file.name
+
+    try:
+        config = load_layout_config(config_path)
+        # 空のファイルの場合はデフォルト設定が使用される
+        assert config.layout.label_width == 148
+        assert config.fonts.label == 9
+    finally:
+        if os.path.exists(config_path):
+            os.remove(config_path)
+
+
+def test_invalid_config_values():
+    """不正な設定値のバリデーションテスト"""
+    # 不正な値（負の値）を含む設定ファイル
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_file:
+        config_data = {"layout": {"label_width": -100}}  # 負の値は不正
+        yaml.dump(config_data, tmp_file)
+        config_path = tmp_file.name
+
+    try:
+        with pytest.raises(ValueError):
+            load_layout_config(config_path)
+    finally:
+        if os.path.exists(config_path):
+            os.remove(config_path)
+
+
+def test_label_generation_with_custom_config():
+    """カスタム設定でのPDF生成テスト"""
+    to_addr = AddressInfo(
+        postal_code="123-4567",
+        address="東京都渋谷区XXX 1-2-3",
+        name="設定太郎",
+        phone="03-1234-5678",
+    )
+    from_addr = AddressInfo(
+        postal_code="987-6543",
+        address="大阪府大阪市YYY 4-5-6",
+        name="設定花子",
+        phone="06-9876-5432",
+    )
+
+    # カスタム設定を作成
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_config:
+        config_data = {
+            "layout": {"label_width": 148, "label_height": 210, "margin": 10},
+            "fonts": {"label": 10, "postal_code": 11, "address": 12, "name": 15, "phone": 12},
+        }
+        yaml.dump(config_data, tmp_config)
+        config_path = tmp_config.name
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        output_path = tmp_pdf.name
+
+    try:
+        result = create_label(to_addr, from_addr, output_path, config_path=config_path)
+        assert os.path.exists(result)
+        assert os.path.getsize(result) > 0
+
+        # CI環境用にPDFを保存
+        save_to_test_output(result)
+    finally:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        if os.path.exists(config_path):
+            os.remove(config_path)
+
+
+def test_label_generator_with_custom_config():
+    """LabelGeneratorクラスでカスタム設定を使用するテスト"""
+    # カスタム設定を作成
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_config:
+        config_data = {
+            "layout": {"margin": 12},
+            "fonts": {"name": 16},
+        }
+        yaml.dump(config_data, tmp_config)
+        config_path = tmp_config.name
+
+    try:
+        generator = LabelGenerator(config_path=config_path)
+        assert generator.config.layout.margin == 12
+        assert generator.config.fonts.name == 16
+        # デフォルト値も正しく設定されているか確認
+        assert generator.config.layout.label_width == 148
+    finally:
+        if os.path.exists(config_path):
+            os.remove(config_path)

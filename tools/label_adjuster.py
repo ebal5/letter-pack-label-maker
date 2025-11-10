@@ -464,47 +464,74 @@ def save_config(config):
 
 
 def form_to_config(form_data):
-    """フォームデータを設定辞書に変換"""
+    """
+    フォームデータを設定辞書に変換し、バリデーションを行う
+
+    Args:
+        form_data: フォームデータ
+
+    Returns:
+        バリデーション済みの設定辞書
+
+    Raises:
+        ValueError: バリデーションエラーが発生した場合
+    """
     config = {"layout": {}, "fonts": {}, "spacing": {}, "address": {}}
 
-    for key, value in form_data.items():
-        if "." not in key:
-            continue
+    try:
+        for key, value in form_data.items():
+            if "." not in key:
+                continue
 
-        section, param = key.split(".", 1)
+            section, param = key.split(".", 1)
 
-        # チェックボックスの特別処理
-        if param == "draw_border":
-            config[section][param] = True
-            continue
+            # チェックボックスの特別処理
+            if param == "draw_border":
+                config[section][param] = True
+                continue
 
-        # 数値変換
-        if param in ["label_width", "label_height", "margin", "phone_margin"]:
-            config[section][param] = float(value)
-        elif param in ["max_length"]:
-            config[section][param] = int(value)
-        else:
-            config[section][param] = int(value)
+            # 数値変換（エラーチェック付き）
+            try:
+                if param in ["label_width", "label_height", "margin", "phone_margin"]:
+                    config[section][param] = float(value)
+                elif param in ["max_length"]:
+                    config[section][param] = int(value)
+                else:
+                    config[section][param] = int(value)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"'{param}' の値 '{value}' が不正です: {e}") from e
 
-    # チェックボックスがオフの場合の処理
-    if "layout.draw_border" not in form_data:
-        config["layout"]["draw_border"] = False
+        # チェックボックスがオフの場合の処理
+        if "layout.draw_border" not in form_data:
+            config["layout"]["draw_border"] = False
 
-    # x_offset と y_offset は常に auto
-    config["layout"]["x_offset"] = "auto"
-    config["layout"]["y_offset"] = "auto"
+        # x_offset と y_offset は常に auto
+        config["layout"]["x_offset"] = "auto"
+        config["layout"]["y_offset"] = "auto"
 
-    return config
+        # Pydanticでバリデーション
+        from letterpack.label import LabelLayoutConfig
+
+        validated = LabelLayoutConfig(**config)
+        return validated.model_dump()
+
+    except Exception as e:
+        raise ValueError(f"設定の変換に失敗しました: {e}") from e
 
 
 def generate_preview_image(config):
     """設定を使ってプレビュー画像を生成"""
-    # 一時設定ファイルを作成
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False, encoding="utf-8") as f:
-        yaml.dump(config, f, allow_unicode=True)
-        temp_config_path = f.name
+    temp_config_path = None
+    temp_pdf_path = None
 
     try:
+        # 一時設定ファイルを作成
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".yaml", delete=False, encoding="utf-8"
+        ) as f:
+            yaml.dump(config, f, allow_unicode=True)
+            temp_config_path = f.name
+
         # PDFを生成
         with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
             temp_pdf_path = f.name
@@ -513,10 +540,12 @@ def generate_preview_image(config):
 
         # PDFを画像に変換
         doc = fitz.open(temp_pdf_path)
-        page = doc[0]
-        pix = page.get_pixmap(dpi=150)
-        img_data = pix.tobytes("png")
-        doc.close()
+        try:
+            page = doc[0]
+            pix = page.get_pixmap(dpi=150)
+            img_data = pix.tobytes("png")
+        finally:
+            doc.close()
 
         # Base64エンコード
         img_base64 = base64.b64encode(img_data).decode("utf-8")
@@ -525,8 +554,10 @@ def generate_preview_image(config):
 
     finally:
         # 一時ファイルを削除
-        Path(temp_config_path).unlink(missing_ok=True)
-        Path(temp_pdf_path).unlink(missing_ok=True)
+        if temp_config_path:
+            Path(temp_config_path).unlink(missing_ok=True)
+        if temp_pdf_path:
+            Path(temp_pdf_path).unlink(missing_ok=True)
 
 
 @app.route("/")

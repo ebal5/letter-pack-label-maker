@@ -5,15 +5,71 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 import yaml
+from pydantic import BaseModel, Field, field_validator
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
+
+
+class LayoutConfig(BaseModel):
+    """レイアウト設定のバリデーションモデル"""
+
+    label_width: float = Field(gt=0, le=300, description="ラベル幅 (mm)")
+    label_height: float = Field(gt=0, le=500, description="ラベル高さ (mm)")
+    x_offset: Literal["auto"] | float = Field(description="X軸オフセット (mm or 'auto')")
+    y_offset: Literal["auto"] | float = Field(description="Y軸オフセット (mm or 'auto')")
+    margin: float = Field(ge=0, le=50, description="マージン (mm)")
+    draw_border: bool = Field(default=True, description="デバッグ用枠線を描画")
+
+    @field_validator("x_offset", "y_offset")
+    @classmethod
+    def validate_offset(cls, v):
+        """オフセットの検証: 'auto' または非負数"""
+        if v != "auto" and isinstance(v, (int, float)) and v < 0:
+            raise ValueError("オフセットは 'auto' または 0以上の数値である必要があります")
+        return v
+
+
+class FontsConfig(BaseModel):
+    """フォント設定のバリデーションモデル"""
+
+    section_label: int = Field(gt=0, le=72, description="セクションラベルのフォントサイズ (pt)")
+    postal_code: int = Field(gt=0, le=72, description="郵便番号のフォントサイズ (pt)")
+    address: int = Field(gt=0, le=72, description="住所のフォントサイズ (pt)")
+    name: int = Field(gt=0, le=72, description="氏名のフォントサイズ (pt)")
+    phone: int = Field(gt=0, le=72, description="電話番号のフォントサイズ (pt)")
+
+
+class SpacingConfig(BaseModel):
+    """スペーシング設定のバリデーションモデル"""
+
+    section_label_offset: int = Field(ge=0, le=200, description="セクションラベルオフセット (px)")
+    postal_offset: int = Field(ge=0, le=200, description="郵便番号オフセット (px)")
+    address_offset: int = Field(ge=0, le=200, description="住所オフセット (px)")
+    address_line_height: int = Field(gt=0, le=100, description="住所行間 (px)")
+    name_offset: int = Field(ge=0, le=200, description="氏名オフセット (px)")
+    phone_margin: float = Field(ge=0, le=50, description="電話番号マージン (mm)")
+
+
+class AddressConfig(BaseModel):
+    """住所設定のバリデーションモデル"""
+
+    max_length: int = Field(gt=0, le=100, description="1行の最大文字数")
+
+
+class LabelLayoutConfig(BaseModel):
+    """ラベルレイアウト設定全体のバリデーションモデル"""
+
+    layout: LayoutConfig
+    fonts: FontsConfig
+    spacing: SpacingConfig
+    address: AddressConfig
 
 
 def load_layout_config(config_path: Optional[str] = None) -> dict[str, Any]:
@@ -25,6 +81,10 @@ def load_layout_config(config_path: Optional[str] = None) -> dict[str, Any]:
 
     Returns:
         設定辞書
+
+    Raises:
+        FileNotFoundError: 設定ファイルが存在しない場合
+        ValueError: 設定ファイルの内容が不正な場合
     """
     if config_path is None:
         # デフォルトパス: プロジェクトルート/config/label_layout.yaml
@@ -37,7 +97,15 @@ def load_layout_config(config_path: Optional[str] = None) -> dict[str, Any]:
         raise FileNotFoundError(f"設定ファイルが見つかりません: {config_path}")
 
     with open(config_path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        raw_config = yaml.safe_load(f)
+
+    # Pydanticでバリデーション
+    try:
+        validated_config = LabelLayoutConfig(**raw_config)
+        # 辞書形式で返す（既存のコードとの互換性のため）
+        return validated_config.model_dump()
+    except Exception as e:
+        raise ValueError(f"設定ファイルの検証に失敗しました: {e}") from e
 
 
 @dataclass
@@ -238,7 +306,8 @@ class LabelGenerator:
         current_line = ""
 
         for char in address:
-            if len(current_line) >= max_length:
+            # 文字を追加すると max_length を超える場合、現在の行を保存して新しい行を開始
+            if current_line and len(current_line) + 1 > max_length:
                 lines.append(current_line)
                 current_line = char
             else:

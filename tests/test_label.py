@@ -213,3 +213,99 @@ def test_label_generator_with_config():
     finally:
         if os.path.exists(output_path):
             os.remove(output_path)
+
+
+def test_address_splitting():
+    """住所分割ロジックのテスト"""
+    generator = LabelGenerator()
+
+    # 短い住所（分割不要）
+    short_address = "東京都"
+    result = generator._split_address(short_address, max_length=30)
+    assert result == ["東京都"]
+    assert all(len(line) <= 30 for line in result)
+
+    # ちょうど30文字の住所
+    exact_length = "1234567890" * 3  # 30文字
+    result = generator._split_address(exact_length, max_length=30)
+    assert result == [exact_length]
+    assert all(len(line) <= 30 for line in result)
+
+    # 31文字の住所（分割が必要）
+    over_length = "1234567890" * 3 + "X"  # 31文字
+    result = generator._split_address(over_length, max_length=30)
+    assert len(result) == 2
+    assert result[0] == "1234567890" * 3  # 30文字
+    assert result[1] == "X"  # 1文字
+    assert all(len(line) <= 30 for line in result)
+
+    # 長い住所（複数行に分割）
+    long_address = "東京都千代田区千代田1-1 東京タワービル10階 株式会社サンプル"
+    result = generator._split_address(long_address, max_length=20)
+    assert len(result) > 1
+    assert all(len(line) <= 20 for line in result)
+    # 再結合すると元の住所になる
+    assert "".join(result) == long_address
+
+
+def test_invalid_config_values():
+    """不正な設定値のバリデーションテスト"""
+    from letterpack.label import LabelLayoutConfig
+
+    # 負のマージン
+    with pytest.raises(Exception):
+        LabelLayoutConfig(
+            layout={
+                "label_width": 148,
+                "label_height": 210,
+                "x_offset": "auto",
+                "y_offset": "auto",
+                "margin": -5,  # 負の値
+                "draw_border": True,
+            },
+            fonts={
+                "section_label": 10,
+                "postal_code": 12,
+                "address": 11,
+                "name": 14,
+                "phone": 10,
+            },
+            spacing={
+                "section_label_offset": 10,
+                "postal_offset": 30,
+                "address_offset": 20,
+                "address_line_height": 18,
+                "name_offset": 10,
+                "phone_margin": 5,
+            },
+            address={"max_length": 30},
+        )
+
+    # フォントサイズが大きすぎる
+    with pytest.raises(Exception):
+        LabelLayoutConfig(
+            layout={
+                "label_width": 148,
+                "label_height": 210,
+                "x_offset": "auto",
+                "y_offset": "auto",
+                "margin": 5,
+                "draw_border": True,
+            },
+            fonts={
+                "section_label": 100,  # 72ptを超える
+                "postal_code": 12,
+                "address": 11,
+                "name": 14,
+                "phone": 10,
+            },
+            spacing={
+                "section_label_offset": 10,
+                "postal_offset": 30,
+                "address_offset": 20,
+                "address_line_height": 18,
+                "name_offset": 10,
+                "phone_margin": 5,
+            },
+            address={"max_length": 30},
+        )

@@ -250,10 +250,12 @@ def test_address_splitting():
 
 def test_invalid_config_values():
     """不正な設定値のバリデーションテスト"""
+    from pydantic import ValidationError
+
     from letterpack.label import LabelLayoutConfig
 
     # 負のマージン
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         LabelLayoutConfig(
             layout={
                 "label_width": 148,
@@ -282,7 +284,7 @@ def test_invalid_config_values():
         )
 
     # フォントサイズが大きすぎる
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
         LabelLayoutConfig(
             layout={
                 "label_width": 148,

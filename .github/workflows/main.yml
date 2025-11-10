@@ -1,0 +1,60 @@
+name: Test PDF Generation
+
+# ワークフローのトリガー設定
+on:
+  # mainブランチへのpush時に実行
+  push:
+    branches: [ main ]
+  # PRの作成・更新時に実行
+  pull_request:
+    branches: [ main ]
+  # 手動実行も可能
+  workflow_dispatch:
+
+jobs:
+  generate-test-pdf:
+    runs-on: ubuntu-latest
+
+    steps:
+    # リポジトリのチェックアウト
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Pythonのセットアップ
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    # uvのインストール
+    - name: Install uv
+      uses: astral-sh/setup-uv@v5
+      with:
+        version: "latest"
+
+    # 依存関係のインストール
+    - name: Install dependencies
+      run: uv sync
+
+    # テストPDFの生成
+    - name: Generate test PDF
+      run: uv run python generate_test_pdf.py
+
+    # 生成されたPDFの確認
+    - name: Verify PDF was created
+      run: |
+        if [ -f test_label.pdf ]; then
+          echo "✓ test_label.pdf が正常に生成されました"
+          ls -lh test_label.pdf
+        else
+          echo "✗ test_label.pdf が見つかりません"
+          exit 1
+        fi
+
+    # 生成されたPDFをアーティファクトとしてアップロード
+    - name: Upload PDF artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-label-pdf
+        path: test_label.pdf
+        retention-days: 30

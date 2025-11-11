@@ -5,7 +5,8 @@
 import argparse
 import sys
 
-from .label import AddressInfo, create_label
+from .csv_parser import parse_csv
+from .label import AddressInfo, create_label, create_label_batch
 
 
 def interactive_input() -> tuple[AddressInfo, AddressInfo, str]:
@@ -111,17 +112,53 @@ def main():
         "--config", help="レイアウト設定ファイルのパス（.yaml）。4丁付レイアウトなどの設定が可能"
     )
 
+    # CSV一括生成
+    parser.add_argument("--csv", help="CSVファイルからの一括生成（4upレイアウトで複数ページPDF）")
+
     args = parser.parse_args()
 
-    # 引数チェック: 全て指定されているか、全て未指定か
-    to_args = [args.to_name, args.to_postal, args.to_address, args.to_phone]
-    from_args = [args.from_name, args.from_postal, args.from_address, args.from_phone]
-    all_args = to_args + from_args
-
-    all_specified = all(arg is not None for arg in all_args)
-    none_specified = all(arg is None for arg in all_args)
-
     try:
+        # CSVモード
+        if args.csv:
+            print("=" * 60)
+            print("CSVファイルからの一括生成")
+            print("=" * 60)
+            print(f"CSVファイル: {args.csv}")
+            print()
+
+            # CSVを読み込み＆バリデーション
+            print("CSVファイルを読み込み中...")
+            labels = parse_csv(args.csv)
+
+            print(f"✓ {len(labels)} 件のラベルを読み込みました")
+            print()
+
+            # PDF生成
+            print(f"PDFを生成中: {args.output}")
+            print(f"  ページ数: {(len(labels) + 3) // 4} ページ（4upレイアウト）")
+
+            # (to_address, from_address) のタプルのリストに変換
+            label_pairs = [(label.to_address, label.from_address) for label in labels]
+
+            result_path = create_label_batch(
+                label_pairs=label_pairs,
+                output_path=args.output,
+                font_path=args.font,
+                config_path=args.config,
+            )
+
+            print(f"✓ PDFを生成しました: {result_path}")
+            return 0
+
+        # 通常モード（1件のみ）
+        # 引数チェック: 全て指定されているか、全て未指定か
+        to_args = [args.to_name, args.to_postal, args.to_address, args.to_phone]
+        from_args = [args.from_name, args.from_postal, args.from_address, args.from_phone]
+        all_args = to_args + from_args
+
+        all_specified = all(arg is not None for arg in all_args)
+        none_specified = all(arg is None for arg in all_args)
+
         if all_specified:
             # 引数から生成
             to_info = AddressInfo(

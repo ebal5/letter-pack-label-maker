@@ -611,6 +611,51 @@ class LabelGenerator:
 
         return lines
 
+    def generate_batch(
+        self, label_pairs: list[tuple[AddressInfo, AddressInfo]], output_path: str
+    ) -> str:
+        """
+        複数のラベルを4upレイアウトで複数ページのPDFとして生成
+
+        Args:
+            label_pairs: (お届け先, ご依頼主) のタプルのリスト
+            output_path: 出力PDFファイルパス
+
+        Returns:
+            生成されたPDFファイルのパス
+        """
+        c = canvas.Canvas(output_path, pagesize=A4)
+        width, height = A4
+
+        label_width = self.config.layout.label_width * mm
+        label_height = self.config.layout.label_height * mm
+
+        # 4upレイアウトの位置定義
+        positions = [
+            (0, height / 2),  # 左上
+            (width / 2, height / 2),  # 右上
+            (0, 0),  # 左下
+            (width / 2, 0),  # 右下
+        ]
+
+        # 4件ごとにページを作成
+        for page_start in range(0, len(label_pairs), 4):
+            # 1ページ分のラベル（最大4件）
+            page_labels = label_pairs[page_start : page_start + 4]
+
+            # 各位置にラベルを配置
+            for i, (to_addr, from_addr) in enumerate(page_labels):
+                x_offset, y_offset = positions[i]
+                self._draw_single_label(
+                    c, to_addr, from_addr, x_offset, y_offset, label_width, label_height
+                )
+
+            # ページを確定
+            c.showPage()
+
+        c.save()
+        return output_path
+
 
 def create_label(
     to_address: AddressInfo,
@@ -634,3 +679,25 @@ def create_label(
     """
     generator = LabelGenerator(font_path=font_path, config_path=config_path)
     return generator.generate(to_address, from_address, output_path)
+
+
+def create_label_batch(
+    label_pairs: list[tuple[AddressInfo, AddressInfo]],
+    output_path: str = "labels.pdf",
+    font_path: Optional[str] = None,
+    config_path: Optional[str] = None,
+) -> str:
+    """
+    複数のラベルを4upレイアウトで1つのPDF（複数ページ）に生成する便利関数
+
+    Args:
+        label_pairs: (お届け先, ご依頼主) のタプルのリスト
+        output_path: 出力PDFファイルパス
+        font_path: 日本語フォントのパス
+        config_path: レイアウト設定ファイルのパス（Noneの場合はデフォルト設定を使用）
+
+    Returns:
+        生成されたPDFファイルのパス
+    """
+    generator = LabelGenerator(font_path=font_path, config_path=config_path)
+    return generator.generate_batch(label_pairs, output_path)

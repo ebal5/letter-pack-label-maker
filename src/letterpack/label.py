@@ -351,7 +351,7 @@ class LabelGenerator:
 
     def _draw_postal_boxes(self, c: canvas.Canvas, postal_code: str, x: float, y: float):
         """
-        郵便番号を7つのボックスで描画
+        郵便番号を3-4の区切り形式で描画
 
         Args:
             c: Canvas オブジェクト
@@ -366,8 +366,8 @@ class LabelGenerator:
         box_spacing = self.config.postal_box.box_spacing * mm
         postal_font_size = self.config.fonts.postal_code
 
-        # 7つのボックスを描画
-        for i in range(7):
+        # 最初の3つのボックスを描画
+        for i in range(3):
             box_x = x + i * (box_size + box_spacing)
             # ボックスの枠
             c.rect(box_x, y, box_size, box_size)
@@ -380,6 +380,30 @@ class LabelGenerator:
                 text_x = box_x + (box_size - text_width) / 2
                 text_y = y + (box_size - postal_font_size) / 2
                 c.drawString(text_x, text_y, digits[i])
+
+        # 区切り線（ハイフン）を描画
+        separator_x = x + 3 * (box_size + box_spacing)
+        separator_y = y + box_size / 2
+        separator_width = box_spacing * 1.5  # ハイフンの長さ
+        c.setLineWidth(1)
+        c.line(separator_x, separator_y, separator_x + separator_width, separator_y)
+
+        # 残りの4つのボックスを描画
+        offset_x = separator_x + separator_width + box_spacing
+        for i in range(4):
+            box_x = offset_x + i * (box_size + box_spacing)
+            # ボックスの枠
+            c.rect(box_x, y, box_size, box_size)
+
+            # 数字を中央に描画
+            digit_index = i + 3
+            if digit_index < len(digits):
+                c.setFont(self.font_name, postal_font_size)
+                # 文字を中央揃え
+                text_width = c.stringWidth(digits[digit_index], self.font_name, postal_font_size)
+                text_x = box_x + (box_size - text_width) / 2
+                text_y = y + (box_size - postal_font_size) / 2
+                c.drawString(text_x, text_y, digits[digit_index])
 
     def _draw_dotted_line(self, c: canvas.Canvas, x1: float, y: float, x2: float):
         """
@@ -442,19 +466,20 @@ class LabelGenerator:
         # 郵便番号（〒記号付き）
         c.setFont(self.font_name, label_font_size)
         c.setFillColorRGB(0, 0, 0)
-        c.drawString(x + margin, current_y, "〒")
+        postal_y = current_y  # 〒記号の位置を記録
+        c.drawString(x + margin, postal_y, "〒")
 
-        current_y -= section_spacing
-
-        # 郵便番号ボックス
+        # 郵便番号ボックス（〒記号と同じ高さに配置）
         c.setFont(self.font_name, self.config.fonts.postal_code)
         c.setFillColorRGB(0, 0, 0)
         self._draw_postal_boxes(
             c,
             address.postal_code,
             x + margin + postal_box_offset_x,
-            current_y + postal_box_offset_y,
+            postal_y + postal_box_offset_y,
         )
+
+        current_y -= section_spacing
 
         current_y -= section_spacing
 

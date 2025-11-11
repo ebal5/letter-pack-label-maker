@@ -82,7 +82,7 @@ class SpacingConfig(BaseModel):
         default=-2, ge=-100, le=100, description="郵便番号ボックスのY軸オフセット (px)"
     )
     dotted_line_text_offset: int = Field(
-        default=2, ge=0, le=50, description="点線からテキストまでのオフセット (px)"
+        default=4, ge=0, le=50, description="点線からテキストまでのオフセット (px)"
     )
 
 

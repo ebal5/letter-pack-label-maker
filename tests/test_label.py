@@ -253,3 +253,47 @@ def test_label_generator_with_custom_config():
     finally:
         if os.path.exists(config_path):
             os.remove(config_path)
+
+
+def test_grid_4up_layout():
+    """4丁付レイアウトのテスト"""
+    to_addr = AddressInfo(
+        postal_code="123-4567",
+        address="東京都渋谷区XXX 1-2-3",
+        name="4丁付太郎",
+        phone="03-1234-5678",
+    )
+    from_addr = AddressInfo(
+        postal_code="987-6543",
+        address="大阪府大阪市YYY 4-5-6",
+        name="4丁付花子",
+        phone="06-9876-5432",
+    )
+
+    # 4丁付レイアウトの設定を作成
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_config:
+        config_data = {"layout": {"layout_mode": "grid_4up"}}
+        yaml.dump(config_data, tmp_config)
+        config_path = tmp_config.name
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        output_path = tmp_pdf.name
+
+    try:
+        result = create_label(to_addr, from_addr, output_path, config_path=config_path)
+        assert os.path.exists(result)
+        assert os.path.getsize(result) > 0
+
+        # CI環境用にPDFを保存
+        save_to_test_output(result)
+    finally:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+        if os.path.exists(config_path):
+            os.remove(config_path)
+
+
+def test_center_layout_default():
+    """中央配置レイアウト（デフォルト）のテスト"""
+    config = load_layout_config(None)
+    assert config.layout.layout_mode == "center"

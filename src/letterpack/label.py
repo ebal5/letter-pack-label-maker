@@ -5,7 +5,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional
 
 import yaml
 from pydantic import BaseModel, Field
@@ -48,6 +48,9 @@ class LayoutConfig(BaseModel):
     label_height: float = Field(default=148, gt=0, le=500, description="ラベルの高さ (mm)")
     margin: float = Field(default=8, ge=0, le=50, description="セクション内のマージン (mm)")
     draw_border: bool = Field(default=True, description="デバッグ用の枠線を描画するか")
+    layout_mode: Literal["center", "grid_4up"] = Field(
+        default="center", description="レイアウトモード: center=中央配置, grid_4up=4丁付"
+    )
 
 
 class FontsConfig(BaseModel):
@@ -264,10 +267,52 @@ class LabelGenerator:
         label_width = self.config.layout.label_width * mm
         label_height = self.config.layout.label_height * mm
 
-        # 中央配置のためのオフセット計算
-        x_offset = (width - label_width) / 2
-        y_offset = (height - label_height) / 2
+        # レイアウトモードに応じて処理を分岐
+        if self.config.layout.layout_mode == "grid_4up":
+            # 4丁付レイアウト（2×2グリッド）
+            positions = [
+                (0, height / 2),  # 左上
+                (width / 2, height / 2),  # 右上
+                (0, 0),  # 左下
+                (width / 2, 0),  # 右下
+            ]
+            for x_offset, y_offset in positions:
+                self._draw_single_label(
+                    c, to_address, from_address, x_offset, y_offset, label_width, label_height
+                )
+        else:
+            # 中央配置レイアウト（デフォルト）
+            x_offset = (width - label_width) / 2
+            y_offset = (height - label_height) / 2
+            self._draw_single_label(
+                c, to_address, from_address, x_offset, y_offset, label_width, label_height
+            )
 
+        c.save()
+        return output_path
+
+    def _draw_single_label(
+        self,
+        c: canvas.Canvas,
+        to_address: AddressInfo,
+        from_address: AddressInfo,
+        x_offset: float,
+        y_offset: float,
+        label_width: float,
+        label_height: float,
+    ):
+        """
+        1つのラベルを描画
+
+        Args:
+            c: Canvas オブジェクト
+            to_address: お届け先情報
+            from_address: ご依頼主情報
+            x_offset: X座標のオフセット
+            y_offset: Y座標のオフセット
+            label_width: ラベルの幅
+            label_height: ラベルの高さ
+        """
         # 枠線（デバッグ用）
         if self.config.layout.draw_border:
             c.setStrokeColorRGB(
@@ -282,6 +327,8 @@ class LabelGenerator:
         section_height = label_height / 2
 
         # 区切り線
+        c.setStrokeColorRGB(0, 0, 0)  # 黒に戻す
+        c.setLineWidth(1)
         c.line(
             x_offset, y_offset + section_height, x_offset + label_width, y_offset + section_height
         )
@@ -301,9 +348,6 @@ class LabelGenerator:
         self._draw_address_section(
             c, from_address, x_offset, y_offset, label_width, section_height, "ご依頼主"
         )
-
-        c.save()
-        return output_path
 
     def _draw_postal_boxes(self, c: canvas.Canvas, postal_code: str, x: float, y: float):
         """

@@ -11,6 +11,7 @@
 
 - ✅ コマンドラインからPDF生成
 - ✅ Webブラウザからの入力・生成
+- ✅ 静的HTMLページ（サーバー不要、Pyodide使用）
 - 🔜 CSVファイルからの一括生成（予定）
 - 🔜 品名フィールドの追加（予定）
 
@@ -77,7 +78,39 @@ uv run python -m letterpack.web
 
 開発環境では環境変数が未設定でも動作しますが、警告が表示されます。
 
-### Docker環境での実行（推奨）
+### 静的HTMLページ（サーバー不要版）⭐ 推奨
+
+**Pyodide**を使用した完全にフロントエンドだけで動作するバージョンです。サーバーのインストールや起動が不要で、HTMLファイルをブラウザで開くだけで使えます。
+
+#### 使い方
+
+```bash
+# 方法1: ローカルHTTPサーバーで開く（推奨）
+python -m http.server 8000
+# ブラウザで http://localhost:8000/index_static.html を開く
+
+# 方法2: 直接ファイルを開く
+# index_static.html をブラウザにドラッグ&ドロップ
+```
+
+#### 特徴
+
+- ✅ **サーバー不要**: HTMLファイルをブラウザで開くだけ
+- ✅ **完全オフライン対応**: 初回ロード後はオフラインでも動作（Pyodideのキャッシュ）
+- ✅ **GitHub Pagesで公開可能**: 静的ホスティングサービスで簡単に公開できる
+- ⚠️ **初回ロードが遅い**: Pyodideのダウンロード（約10MB）に時間がかかる
+- ⚠️ **フォントが限定的**: ReportLabのデフォルトCJKフォント（HeiseiMin-W3など）を使用
+
+#### GitHub Pagesで公開する
+
+```bash
+# リポジトリのSettingsから GitHub Pages を有効化
+# Source: Deploy from a branch
+# Branch: main (または別のブランチ)
+# 公開URL: https://yourusername.github.io/letter-pack-label-maker/index_static.html
+```
+
+### Docker環境での実行
 
 フォント環境を統一し、どの環境でも一貫したPDF出力を得るために、Docker環境の使用を推奨します。
 

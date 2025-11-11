@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pyodide + ReportLab PoC</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+        }
+        .status.loading {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+        }
+        .status.success {
+            background: #e8f5e9;
+            border-left-color: #4caf50;
+        }
+        .status.error {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        #log {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Pyodide + ReportLab 動作確認</h1>
+
+        <div id="status" class="status loading">
+            初期化中...
+        </div>
+
+        <button id="testBtn" disabled onclick="testReportLab()">
+            ReportLabテスト実行
+        </button>
+
+        <div id="log"></div>
+    </div>
+
+    <script>
+        let pyodide = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `status ${type}`;
+            entry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            logDiv.appendChild(entry);
+        }
+
+        async function initPyodide() {
+            const statusDiv = document.getElementById('status');
+            const testBtn = document.getElementById('testBtn');
+
+            try {
+                statusDiv.textContent = 'Pyodideをロード中...';
+                log('Pyodideの初期化を開始');
+
+                pyodide = await loadPyodide({
+                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/"
+                });
+
+                log('Pyodideのロード完了', 'success');
+                statusDiv.textContent = 'パッケージをインストール中...';
+
+                // micropipをロード
+                await pyodide.loadPackage('micropip');
+                log('micropipのロード完了', 'success');
+
+                // 必要なパッケージをインストール
+                log('ReportLabをインストール中...');
+                await pyodide.runPythonAsync(`
+                    import micropip
+                    await micropip.install('reportlab')
+                `);
+                log('ReportLabのインストール完了', 'success');
+
+                log('Pydanticをインストール中...');
+                await pyodide.runPythonAsync(`
+                    import micropip
+                    await micropip.install('pydantic')
+                `);
+                log('Pydanticのインストール完了', 'success');
+
+                // 基本的な動作確認
+                const pythonVersion = pyodide.runPython(`
+                    import sys
+                    sys.version
+                `);
+                log(`Python version: ${pythonVersion}`, 'success');
+
+                statusDiv.textContent = '初期化完了！テストボタンをクリックしてください';
+                statusDiv.className = 'status success';
+                testBtn.disabled = false;
+
+            } catch (error) {
+                console.error('Error:', error);
+                statusDiv.textContent = `エラー: ${error.message}`;
+                statusDiv.className = 'status error';
+                log(`初期化エラー: ${error.message}`, 'error');
+            }
+        }
+
+        async function testReportLab() {
+            const testBtn = document.getElementById('testBtn');
+            testBtn.disabled = true;
+
+            try {
+                log('ReportLabでPDF生成テスト開始');
+
+                // 簡単なPDF生成テスト
+                const result = await pyodide.runPythonAsync(`
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+
+# メモリ上にPDFを生成
+buffer = BytesIO()
+c = canvas.Canvas(buffer, pagesize=A4)
+c.drawString(100, 750, "Hello from Pyodide + ReportLab!")
+c.drawString(100, 730, "日本語テスト: こんにちは")
+c.showPage()
+c.save()
+
+# PDFのバイト数を取得
+buffer.seek(0)
+pdf_bytes = buffer.getvalue()
+len(pdf_bytes)
+                `);
+
+                log(`PDF生成成功！サイズ: ${result} bytes`, 'success');
+
+                // 実際にPDFをダウンロード
+                log('PDFファイルをダウンロード中...');
+                const pdfBytes = pyodide.runPython(`
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+
+buffer = BytesIO()
+c = canvas.Canvas(buffer, pagesize=A4)
+c.drawString(100, 750, "Hello from Pyodide + ReportLab!")
+c.drawString(100, 730, "This is a test PDF")
+c.showPage()
+c.save()
+
+buffer.seek(0)
+buffer.getvalue()
+                `);
+
+                // PDFをダウンロード
+                const blob = new Blob([pdfBytes.toJs()], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'test_reportlab.pdf';
+                a.click();
+                URL.revokeObjectURL(url);
+
+                log('PDFダウンロード完了！', 'success');
+                log('✅ ReportLabは正常に動作しています', 'success');
+
+            } catch (error) {
+                console.error('Test error:', error);
+                log(`テストエラー: ${error.message}`, 'error');
+            } finally {
+                testBtn.disabled = false;
+            }
+        }
+
+        // ページロード時に初期化
+        window.addEventListener('load', initPyodide);
+    </script>
+</body>
+</html>

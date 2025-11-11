@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レターパックラベル作成（静的版）</title>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        .content {
+            padding: 40px;
+        }
+        .section {
+            margin-bottom: 35px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .section h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .btn-container {
+            text-align: center;
+            margin-top: 30px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 50px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .alert {
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .alert-error {
+            background: #fee;
+            color: #c33;
+            border-left: 4px solid #c33;
+        }
+        .alert-success {
+            background: #efe;
+            color: #3c3;
+            border-left: 4px solid #3c3;
+        }
+        .alert-info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border-left: 4px solid #2196F3;
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+            background: #f8f9fa;
+        }
+        .example {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+        #loading-status {
+            display: none;
+        }
+        #loading-status.show {
+            display: block;
+        }
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📮 レターパックラベル作成</h1>
+            <p class="subtitle">フロントエンドだけで動作（サーバー不要）</p>
+        </header>
+
+        <div class="content">
+            <div id="loading-status" class="alert alert-info show">
+                <div class="spinner" style="margin-right: 10px;"></div>
+                Pyodideを初期化中...（初回は10秒程度かかります）
+            </div>
+
+            <div id="error-message"></div>
+
+            <form id="label-form" style="display:none;">
+                <div class="section">
+                    <h2>📬 お届け先</h2>
+                    <div class="form-group">
+                        <label for="to_postal">郵便番号 *</label>
+                        <input type="text" id="to_postal" name="to_postal"
+                               placeholder="例: 123-4567" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="to_address">住所 *</label>
+                        <input type="text" id="to_address" name="to_address"
+                               placeholder="例: 東京都渋谷区XXX 1-2-3 XXXビル4F" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="to_name">氏名 *</label>
+                        <input type="text" id="to_name" name="to_name"
+                               placeholder="例: 山田 太郎" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="to_honorific">敬称</label>
+                        <input type="text" id="to_honorific" name="to_honorific"
+                               placeholder="例: 様、殿、御中、行（未入力でデフォルト「様」）" value="様">
+                        <p class="example">※ 未入力の場合は「様」が使用されます</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="to_phone">電話番号 *</label>
+                        <input type="text" id="to_phone" name="to_phone"
+                               placeholder="例: 03-1234-5678" required>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>📤 ご依頼主</h2>
+                    <div class="form-group">
+                        <label for="from_postal">郵便番号 *</label>
+                        <input type="text" id="from_postal" name="from_postal"
+                               placeholder="例: 987-6543" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="from_address">住所 *</label>
+                        <input type="text" id="from_address" name="from_address"
+                               placeholder="例: 大阪府大阪市YYY 4-5-6" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="from_name">氏名 *</label>
+                        <input type="text" id="from_name" name="from_name"
+                               placeholder="例: 田中 花子" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="from_honorific">敬称</label>
+                        <input type="text" id="from_honorific" name="from_honorific"
+                               placeholder="例: 様、殿、御中、行（未入力で敬称なし）" value="">
+                        <p class="example">※ 未入力の場合は敬称なしになります</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="from_phone">電話番号 *</label>
+                        <input type="text" id="from_phone" name="from_phone"
+                               placeholder="例: 06-9876-5432" required>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h2>⚙️ レイアウト設定</h2>
+                    <div class="form-group">
+                        <label for="layout_mode">レイアウトモード</label>
+                        <select id="layout_mode" name="layout_mode">
+                            <option value="center">中央配置（1枚）</option>
+                            <option value="grid_4up">4丁付（2×2グリッド、同じラベル4枚）</option>
+                        </select>
+                        <p class="example">※ 4丁付を選択すると、A4用紙に同じラベルが4つ印刷されます</p>
+                    </div>
+                </div>
+
+                <div class="btn-container">
+                    <button type="submit" id="generate-btn">📄 PDFを生成</button>
+                </div>
+            </form>
+        </div>
+
+        <footer>
+            Letter Pack Label Maker v0.2.0 (Static) | MIT License
+        </footer>
+    </div>
+
+    <script>
+        let pyodide = null;
+        let pythonInitialized = false;
+
+        // Python label生成コード（簡略版 - フォント処理を簡素化）
+        const labelPythonCode = `
+from dataclasses import dataclass
+from typing import Optional
+from io import BytesIO
+
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+@dataclass
+class AddressInfo:
+    postal_code: str
+    address: str
+    name: str
+    phone: str
+    honorific: Optional[str] = None
+
+    def __post_init__(self):
+        if not self.postal_code:
+            raise ValueError("郵便番号は必須です")
+        if not self.address:
+            raise ValueError("住所は必須です")
+        if not self.name:
+            raise ValueError("氏名は必須です")
+        if not self.phone:
+            raise ValueError("電話番号は必須です")
+
+class LabelGenerator:
+    def __init__(self, layout_mode="center"):
+        # Pyodide環境用にフォントを簡素化
+        try:
+            pdfmetrics.registerFont(UnicodeCIDFont("HeiseiMin-W3"))
+            self.font_name = "HeiseiMin-W3"
+        except:
+            try:
+                pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
+                self.font_name = "HeiseiKakuGo-W5"
+            except:
+                self.font_name = "Helvetica"
+
+        self.layout_mode = layout_mode
+
+    def generate(self, to_address, from_address):
+        buffer = BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        width, height = A4
+
+        label_width = 105 * mm
+        label_height = 148 * mm
+
+        if self.layout_mode == "grid_4up":
+            positions = [
+                (0, height / 2),
+                (width / 2, height / 2),
+                (0, 0),
+                (width / 2, 0),
+            ]
+            for x_offset, y_offset in positions:
+                self._draw_single_label(c, to_address, from_address, x_offset, y_offset, label_width, label_height)
+        else:
+            x_offset = (width - label_width) / 2
+            y_offset = (height - label_height) / 2
+            self._draw_single_label(c, to_address, from_address, x_offset, y_offset, label_width, label_height)
+
+        c.save()
+        buffer.seek(0)
+        return buffer.getvalue()
+
+    def _draw_single_label(self, c, to_address, from_address, x_offset, y_offset, label_width, label_height):
+        c.setStrokeColorRGB(0.8, 0.8, 0.8)
+        c.setLineWidth(0.5)
+        c.rect(x_offset, y_offset, label_width, label_height)
+
+        section_height = label_height / 2
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(1)
+        c.line(x_offset, y_offset + section_height, x_offset + label_width, y_offset + section_height)
+
+        self._draw_address_section(c, to_address, x_offset, y_offset + section_height, label_width, section_height, "お届け先")
+        self._draw_address_section(c, from_address, x_offset, y_offset, label_width, section_height, "ご依頼主")
+
+    def _draw_postal_boxes(self, c, postal_code, x, y):
+        digits = postal_code.replace("-", "").replace("〒", "").strip()
+        box_size = 5 * mm
+        box_spacing = 1 * mm
+        postal_font_size = 13
+
+        c.setLineWidth(0.5)
+
+        for i in range(3):
+            box_x = x + i * (box_size + box_spacing)
+            c.rect(box_x, y, box_size, box_size)
+            if i < len(digits):
+                c.setFont(self.font_name, postal_font_size)
+                text_width = c.stringWidth(digits[i], self.font_name, postal_font_size)
+                text_x = box_x + (box_size - text_width) / 2
+                text_y = y + (box_size - postal_font_size) / 2 + 2
+                c.drawString(text_x, text_y, digits[i])
+
+        separator_x = x + 3 * (box_size + box_spacing)
+        separator_y = y + box_size / 2
+        separator_width = box_spacing * 1.5
+        c.line(separator_x, separator_y, separator_x + separator_width, separator_y)
+
+        offset_x = separator_x + separator_width + box_spacing
+        for i in range(4):
+            box_x = offset_x + i * (box_size + box_spacing)
+            c.rect(box_x, y, box_size, box_size)
+            digit_index = i + 3
+            if digit_index < len(digits):
+                c.setFont(self.font_name, postal_font_size)
+                text_width = c.stringWidth(digits[digit_index], self.font_name, postal_font_size)
+                text_x = box_x + (box_size - text_width) / 2
+                text_y = y + (box_size - postal_font_size) / 2 + 2
+                c.drawString(text_x, text_y, digits[digit_index])
+
+        c.setLineWidth(1)
+
+    def _draw_dotted_line(self, c, x1, y, x2):
+        c.setDash(2, 2)
+        c.setStrokeColorRGB(0.5, 0.5, 0.5)
+        c.line(x1, y, x2, y)
+        c.setDash()
+        c.setStrokeColorRGB(0, 0, 0)
+
+    def _draw_address_section(self, c, address, x, y, width, height, label):
+        margin = 8 * mm
+        current_y = y + height - margin
+
+        c.setFont(self.font_name, 9)
+        c.setFillColorRGB(0, 0, 0)
+        postal_y = current_y
+        c.drawString(x + margin, postal_y, "〒")
+
+        c.setFont(self.font_name, 13)
+        self._draw_postal_boxes(c, address.postal_code, x + margin + 15, postal_y - 2)
+
+        current_y -= 15
+        current_y -= 15
+
+        address_lines = self._split_address(address.address, 35)
+        for line in address_lines[:3]:
+            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+            c.setFont(self.font_name, 11)
+            c.drawString(x + margin + 4, current_y + 4, line)
+            current_y -= 18
+
+        for _ in range(3 - len(address_lines)):
+            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+            current_y -= 18
+
+        current_y -= 27
+
+        honorific = address.honorific if address.honorific else ""
+        if honorific:
+            sama_width = 8 * mm
+            name_line_end = x + width - margin - sama_width
+        else:
+            name_line_end = x + width - margin
+
+        self._draw_dotted_line(c, x + margin, current_y, name_line_end)
+
+        c.setFont(self.font_name, 14)
+        c.setFillColorRGB(0, 0, 0)
+        c.drawString(x + margin + 4, current_y + 4, address.name)
+
+        if honorific:
+            c.setFont(self.font_name, 14)
+            sama_x = name_line_end + 2 * mm
+            c.drawString(sama_x, current_y + 4, honorific)
+
+        current_y -= 36
+
+        c.setFont(self.font_name, 9)
+        c.drawString(x + margin, current_y, "Tel.")
+
+        current_y -= 15
+
+        c.setFont(self.font_name, 13)
+        phone_text = f"( {address.phone} )"
+        c.drawString(x + margin + 30, current_y, phone_text)
+
+    def _split_address(self, address, max_length=30):
+        if len(address) <= max_length:
+            return [address]
+
+        lines = []
+        current_line = ""
+
+        for char in address:
+            if len(current_line) >= max_length:
+                lines.append(current_line)
+                current_line = char
+            else:
+                current_line += char
+
+        if current_line:
+            lines.append(current_line)
+
+        return lines
+
+def create_label_bytes(to_info, from_info, layout_mode="center"):
+    generator = LabelGenerator(layout_mode=layout_mode)
+    return generator.generate(to_info, from_info)
+`;
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.innerHTML = `<div class="alert alert-error">${message}</div>`;
+            setTimeout(() => {
+                errorDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.innerHTML = `<div class="alert alert-success">${message}</div>`;
+            setTimeout(() => {
+                errorDiv.innerHTML = '';
+            }, 3000);
+        }
+
+        async function initPyodide() {
+            const loadingStatus = document.getElementById('loading-status');
+            const form = document.getElementById('label-form');
+
+            try {
+                loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> Pyodideをロード中...';
+
+                pyodide = await loadPyodide({
+                    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/"
+                });
+
+                loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> ReportLabをインストール中...';
+
+                await pyodide.loadPackage('micropip');
+                await pyodide.runPythonAsync(`
+                    import micropip
+                    await micropip.install('reportlab')
+                `);
+
+                loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> Python コードをロード中...';
+
+                pyodide.runPython(labelPythonCode);
+
+                pythonInitialized = true;
+                loadingStatus.classList.remove('show');
+                loadingStatus.style.display = 'none';
+                form.style.display = 'block';
+                showSuccess('初期化完了！フォームに入力してPDFを生成できます');
+
+            } catch (error) {
+                console.error('Initialization error:', error);
+                loadingStatus.innerHTML = `<div class="alert alert-error">初期化エラー: ${error.message}</div>`;
+            }
+        }
+
+        async function generatePDF(event) {
+            event.preventDefault();
+
+            if (!pythonInitialized) {
+                showError('Pythonが初期化されていません');
+                return;
+            }
+
+            const generateBtn = document.getElementById('generate-btn');
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span class="spinner" style="margin-right: 10px;"></span> PDF生成中...';
+
+            try {
+                // フォームデータ取得
+                const formData = new FormData(event.target);
+                const data = {
+                    to_postal: formData.get('to_postal').trim(),
+                    to_address: formData.get('to_address').trim(),
+                    to_name: formData.get('to_name').trim(),
+                    to_honorific: formData.get('to_honorific').trim() || '様',
+                    to_phone: formData.get('to_phone').trim(),
+                    from_postal: formData.get('from_postal').trim(),
+                    from_address: formData.get('from_address').trim(),
+                    from_name: formData.get('from_name').trim(),
+                    from_honorific: formData.get('from_honorific').trim(),
+                    from_phone: formData.get('from_phone').trim(),
+                    layout_mode: formData.get('layout_mode')
+                };
+
+                // Pythonでpdf生成
+                pyodide.globals.set('form_data', data);
+                const pdfBytes = await pyodide.runPythonAsync(`
+to_info = AddressInfo(
+    postal_code=form_data['to_postal'],
+    address=form_data['to_address'],
+    name=form_data['to_name'],
+    phone=form_data['to_phone'],
+    honorific=form_data['to_honorific'] if form_data['to_honorific'] else None
+)
+
+from_info = AddressInfo(
+    postal_code=form_data['from_postal'],
+    address=form_data['from_address'],
+    name=form_data['from_name'],
+    phone=form_data['from_phone'],
+    honorific=form_data['from_honorific'] if form_data['from_honorific'] else None
+)
+
+pdf_bytes = create_label_bytes(to_info, from_info, form_data['layout_mode'])
+pdf_bytes
+                `);
+
+                // PDFダウンロード
+                const blob = new Blob([pdfBytes.toJs()], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'letterpack_label.pdf';
+                a.click();
+                URL.revokeObjectURL(url);
+
+                showSuccess('PDFを生成しました！ダウンロードを確認してください');
+
+            } catch (error) {
+                console.error('PDF generation error:', error);
+                showError(`PDF生成エラー: ${error.message}`);
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '📄 PDFを生成';
+            }
+        }
+
+        // イベントリスナー設定
+        document.getElementById('label-form').addEventListener('submit', generatePDF);
+
+        // ページロード時に初期化
+        window.addEventListener('load', initPyodide);
+    </script>
+</body>
+</html>

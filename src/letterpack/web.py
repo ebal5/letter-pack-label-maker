@@ -38,7 +38,7 @@ app.secret_key = secret_key
 
 
 # HTMLテンプレート
-HTML_TEMPLATE = """
+HTML_TEMPLATE = r"""
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -167,7 +167,66 @@ HTML_TEMPLATE = """
             color: #999;
             margin-top: 4px;
         }
+        .loading {
+            color: #667eea;
+            font-size: 12px;
+            margin-top: 4px;
+        }
     </style>
+    <script>
+        // 郵便番号から住所を自動補完する関数
+        async function searchAddress(postalCode, addressFieldId) {
+            // 住所フィールドの要素を取得
+            const addressField = document.getElementById(addressFieldId);
+
+            // 住所が既に入力されている場合は何もしない
+            if (addressField.value.trim() !== '') {
+                return;
+            }
+
+            // 郵便番号のフォーマットをクリーンアップ（ハイフンを除去）
+            const cleanPostalCode = postalCode.replace(/[－ー\-]/g, '');
+
+            // 7桁でない場合は検索しない
+            if (cleanPostalCode.length !== 7) {
+                return;
+            }
+
+            try {
+                // zipcloud APIを使用して住所を検索
+                const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${cleanPostalCode}`);
+                const data = await response.json();
+
+                if (data.status === 200 && data.results) {
+                    // 最初の結果を使用
+                    const result = data.results[0];
+                    const address = `${result.address1}${result.address2}${result.address3}`;
+
+                    // 住所フィールドが空の場合のみ自動補完
+                    if (addressField.value.trim() === '') {
+                        addressField.value = address;
+                    }
+                }
+            } catch (error) {
+                console.error('住所の取得に失敗しました:', error);
+            }
+        }
+
+        // ページ読み込み後にイベントリスナーを設定
+        document.addEventListener('DOMContentLoaded', function() {
+            // お届け先の郵便番号フィールド
+            const toPostalField = document.getElementById('to_postal');
+            toPostalField.addEventListener('blur', function() {
+                searchAddress(this.value, 'to_address');
+            });
+
+            // ご依頼主の郵便番号フィールド
+            const fromPostalField = document.getElementById('from_postal');
+            fromPostalField.addEventListener('blur', function() {
+                searchAddress(this.value, 'from_address');
+            });
+        });
+    </script>
 </head>
 <body>
     <div class="container">

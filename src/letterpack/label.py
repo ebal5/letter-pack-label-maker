@@ -57,7 +57,7 @@ class FontsConfig(BaseModel):
     """フォントサイズ設定"""
 
     label: int = Field(default=9, gt=0, le=72, description="フィールドラベルのフォントサイズ (pt)")
-    postal_code: int = Field(default=10, gt=0, le=72, description="郵便番号のフォントサイズ (pt)")
+    postal_code: int = Field(default=13, gt=0, le=72, description="郵便番号のフォントサイズ (pt)")
     address: int = Field(default=11, gt=0, le=72, description="住所のフォントサイズ (pt)")
     name: int = Field(default=14, gt=0, le=72, description="氏名のフォントサイズ (pt)")
     phone: int = Field(default=11, gt=0, le=72, description="電話番号のフォントサイズ (pt)")
@@ -78,7 +78,7 @@ class SpacingConfig(BaseModel):
         default=15, ge=-100, le=100, description="郵便番号ボックスのX軸オフセット (px)"
     )
     postal_box_offset_y: int = Field(
-        default=-5, ge=-100, le=100, description="郵便番号ボックスのY軸オフセット (px)"
+        default=-2, ge=-100, le=100, description="郵便番号ボックスのY軸オフセット (px)"
     )
     dotted_line_text_offset: int = Field(
         default=2, ge=0, le=50, description="点線からテキストまでのオフセット (px)"
@@ -90,6 +90,10 @@ class PostalBoxConfig(BaseModel):
 
     box_size: float = Field(default=5, gt=0, le=20, description="ボックスのサイズ (mm)")
     box_spacing: float = Field(default=1, ge=0, le=10, description="ボックス間の間隔 (mm)")
+    line_width: float = Field(default=0.5, gt=0, le=5, description="枠線の太さ (pt)")
+    text_vertical_offset: float = Field(
+        default=2, ge=-10, le=10, description="数字の垂直オフセット (pt)"
+    )
 
 
 class AddressLayoutConfig(BaseModel):
@@ -198,11 +202,15 @@ class LabelGenerator:
 
     def _setup_font(self):
         """フォント設定"""
+        # 太字フォントのデフォルト（後で上書きされる可能性あり）
+        self.bold_font_name = None
+
         if self.font_path and os.path.exists(self.font_path):
             # カスタムフォントを登録
             try:
                 pdfmetrics.registerFont(TTFont("CustomFont", self.font_path))
                 self.font_name = "CustomFont"
+                self.bold_font_name = "CustomFont"  # 太字版がない場合は通常フォントを使用
                 return
             except Exception as e:
                 print(f"警告: カスタムフォントの読み込みに失敗しました: {e}")
@@ -216,11 +224,29 @@ class LabelGenerator:
             "/usr/share/fonts/truetype/ipafont/ipag.ttf",
         ]
 
+        # IPAGothic太字版のパス
+        ipa_bold_font_paths = [
+            "/usr/share/fonts/opentype/ipafont-gothic/ipagp.ttf",
+            "/usr/share/fonts/truetype/ipafont/ipagp.ttf",
+        ]
+
         for font_path in ipa_font_paths:
             if os.path.exists(font_path):
                 try:
                     pdfmetrics.registerFont(TTFont("IPAGothic", font_path))
                     self.font_name = "IPAGothic"
+                    # 太字フォントも探す
+                    for bold_font_path in ipa_bold_font_paths:
+                        if os.path.exists(bold_font_path):
+                            try:
+                                pdfmetrics.registerFont(TTFont("IPAGothicBold", bold_font_path))
+                                self.bold_font_name = "IPAGothicBold"
+                                break
+                            except Exception:
+                                continue
+                    # 太字フォントが見つからない場合は通常フォントを使用
+                    if not self.bold_font_name:
+                        self.bold_font_name = "IPAGothic"
                     return
                 except Exception as e:
                     print(f"警告: IPAGothic ({font_path}) の登録に失敗しました: {e}")
@@ -230,6 +256,7 @@ class LabelGenerator:
         try:
             pdfmetrics.registerFont(UnicodeCIDFont("HeiseiMin-W3"))
             self.font_name = "HeiseiMin-W3"
+            self.bold_font_name = "HeiseiMin-W3"
             print(
                 "警告: IPAフォントが見つかりません。HeiseiMin-W3を使用します（一部の文字が表示されない可能性があります）"
             )
@@ -239,6 +266,7 @@ class LabelGenerator:
             try:
                 pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
                 self.font_name = "HeiseiKakuGo-W5"
+                self.bold_font_name = "HeiseiKakuGo-W5"
                 print(
                     "警告: HeiseiKakuGo-W5を使用します（一部の文字が表示されない可能性があります）"
                 )
@@ -246,6 +274,7 @@ class LabelGenerator:
                 print(f"警告: HeiseiKakuGo-W5の登録にも失敗しました: {e2}")
                 # 最終フォールバック: Helvetica（日本語は表示できないが動作する）
                 self.font_name = "Helvetica"
+                self.bold_font_name = "Helvetica-Bold"
                 print("警告: 日本語フォントが利用できません。Helveticaを使用します")
 
     def generate(self, to_address: AddressInfo, from_address: AddressInfo, output_path: str) -> str:
@@ -351,7 +380,7 @@ class LabelGenerator:
 
     def _draw_postal_boxes(self, c: canvas.Canvas, postal_code: str, x: float, y: float):
         """
-        郵便番号を7つのボックスで描画
+        郵便番号を3-4の区切り形式で描画
 
         Args:
             c: Canvas オブジェクト
@@ -361,25 +390,60 @@ class LabelGenerator:
         # ハイフンを除去して数字のみ抽出
         digits = postal_code.replace("-", "").replace("〒", "").strip()
 
-        # 設定からボックスのサイズを取得
+        # 設定からボックスのサイズと枠線の太さを取得
         box_size = self.config.postal_box.box_size * mm
         box_spacing = self.config.postal_box.box_spacing * mm
+        box_line_width = self.config.postal_box.line_width
+        text_vertical_offset = self.config.postal_box.text_vertical_offset
         postal_font_size = self.config.fonts.postal_code
 
-        # 7つのボックスを描画
-        for i in range(7):
+        # 太字フォントを使用（利用可能な場合）
+        bold_font_name = getattr(self, "bold_font_name", self.font_name)
+
+        # 枠線の太さを設定
+        c.setLineWidth(box_line_width)
+
+        # 最初の3つのボックスを描画
+        for i in range(3):
             box_x = x + i * (box_size + box_spacing)
             # ボックスの枠
             c.rect(box_x, y, box_size, box_size)
 
-            # 数字を中央に描画
+            # 数字を中央に描画（垂直オフセット付き）
             if i < len(digits):
-                c.setFont(self.font_name, postal_font_size)
+                c.setFont(bold_font_name, postal_font_size)
                 # 文字を中央揃え
-                text_width = c.stringWidth(digits[i], self.font_name, postal_font_size)
+                text_width = c.stringWidth(digits[i], bold_font_name, postal_font_size)
                 text_x = box_x + (box_size - text_width) / 2
-                text_y = y + (box_size - postal_font_size) / 2
+                text_y = y + (box_size - postal_font_size) / 2 + text_vertical_offset
                 c.drawString(text_x, text_y, digits[i])
+
+        # 区切り線（ハイフン）を描画
+        separator_x = x + 3 * (box_size + box_spacing)
+        separator_y = y + box_size / 2
+        separator_width = box_spacing * 1.5  # ハイフンの長さ
+        c.setLineWidth(box_line_width)
+        c.line(separator_x, separator_y, separator_x + separator_width, separator_y)
+
+        # 残りの4つのボックスを描画
+        offset_x = separator_x + separator_width + box_spacing
+        for i in range(4):
+            box_x = offset_x + i * (box_size + box_spacing)
+            # ボックスの枠
+            c.rect(box_x, y, box_size, box_size)
+
+            # 数字を中央に描画（垂直オフセット付き）
+            digit_index = i + 3
+            if digit_index < len(digits):
+                c.setFont(bold_font_name, postal_font_size)
+                # 文字を中央揃え
+                text_width = c.stringWidth(digits[digit_index], bold_font_name, postal_font_size)
+                text_x = box_x + (box_size - text_width) / 2
+                text_y = y + (box_size - postal_font_size) / 2 + text_vertical_offset
+                c.drawString(text_x, text_y, digits[digit_index])
+
+        # 線の太さをリセット
+        c.setLineWidth(1)
 
     def _draw_dotted_line(self, c: canvas.Canvas, x1: float, y: float, x2: float):
         """
@@ -442,19 +506,20 @@ class LabelGenerator:
         # 郵便番号（〒記号付き）
         c.setFont(self.font_name, label_font_size)
         c.setFillColorRGB(0, 0, 0)
-        c.drawString(x + margin, current_y, "〒")
+        postal_y = current_y  # 〒記号の位置を記録
+        c.drawString(x + margin, postal_y, "〒")
 
-        current_y -= section_spacing
-
-        # 郵便番号ボックス
+        # 郵便番号ボックス（〒記号と同じ高さに配置）
         c.setFont(self.font_name, self.config.fonts.postal_code)
         c.setFillColorRGB(0, 0, 0)
         self._draw_postal_boxes(
             c,
             address.postal_code,
             x + margin + postal_box_offset_x,
-            current_y + postal_box_offset_y,
+            postal_y + postal_box_offset_y,
         )
+
+        current_y -= section_spacing
 
         current_y -= section_spacing
 

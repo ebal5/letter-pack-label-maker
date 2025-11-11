@@ -125,10 +125,13 @@ def test_load_default_config():
     assert config.layout.label_height == 148
     assert config.layout.margin == 8
     assert config.fonts.label == 9
-    assert config.fonts.postal_code == 10
+    assert config.fonts.postal_code == 13
     assert config.fonts.address == 11
     assert config.fonts.name == 14
     assert config.fonts.phone == 11
+    assert config.postal_box.line_width == 0.5
+    assert config.postal_box.text_vertical_offset == 2
+    assert config.spacing.postal_box_offset_y == -2
 
 
 def test_load_custom_config():

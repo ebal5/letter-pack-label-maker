@@ -38,7 +38,7 @@ app.secret_key = secret_key
 
 
 # HTMLテンプレート
-HTML_TEMPLATE = """
+HTML_TEMPLATE = r"""
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -167,7 +167,179 @@ HTML_TEMPLATE = """
             color: #999;
             margin-top: 4px;
         }
+        .loading {
+            color: #667eea;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .address-choices {
+            margin-top: 8px;
+            padding: 12px;
+            background: #f0f0f0;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+        .address-choice-button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .address-choice-button:hover {
+            background: #f8f9fa;
+            border-color: #667eea;
+            transform: translateX(4px);
+        }
+        .address-choice-close {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            background: #999;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .address-choice-close:hover {
+            background: #777;
+        }
+        .address-choice-label {
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
     </style>
+    <script>
+        // 複数の住所候補がある場合に選択肢を表示する関数
+        function showAddressChoices(addressFieldId, addresses) {
+            // 既存の選択肢があれば削除
+            const existingChoices = document.getElementById(addressFieldId + '_choices');
+            if (existingChoices) {
+                existingChoices.remove();
+            }
+
+            const addressField = document.getElementById(addressFieldId);
+            const container = addressField.parentElement;
+
+            // 選択肢を表示するコンテナを作成
+            const choicesDiv = document.createElement('div');
+            choicesDiv.id = addressFieldId + '_choices';
+            choicesDiv.className = 'address-choices';
+
+            // ラベルを追加
+            const label = document.createElement('div');
+            label.className = 'address-choice-label';
+            label.textContent = '複数の住所が見つかりました。選択してください：';
+            choicesDiv.appendChild(label);
+
+            // 各住所の選択ボタンを作成
+            addresses.forEach(function(addr) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'address-choice-button';
+                const fullAddress = addr.ja.prefecture + addr.ja.address1 + addr.ja.address2 + (addr.ja.address3 || '');
+                button.textContent = fullAddress;
+                button.onclick = function() {
+                    addressField.value = fullAddress;
+                    choicesDiv.remove();
+                };
+                choicesDiv.appendChild(button);
+            });
+
+            // 閉じるボタンを追加
+            const closeButton = document.createElement('button');
+            closeButton.type = 'button';
+            closeButton.className = 'address-choice-close';
+            closeButton.textContent = '✕ 閉じる';
+            closeButton.onclick = function() {
+                choicesDiv.remove();
+            };
+            choicesDiv.appendChild(closeButton);
+
+            container.appendChild(choicesDiv);
+        }
+
+        // 郵便番号から住所を自動補完する関数
+        async function searchAddress(postalCode, addressFieldId) {
+            // 住所フィールドの要素を取得
+            const addressField = document.getElementById(addressFieldId);
+
+            // 住所が既に入力されている場合は何もしない
+            if (addressField.value.trim() !== '') {
+                return;
+            }
+
+            // 既存の選択肢があれば削除
+            const existingChoices = document.getElementById(addressFieldId + '_choices');
+            if (existingChoices) {
+                existingChoices.remove();
+            }
+
+            // 郵便番号のフォーマットをクリーンアップ（ハイフンを除去）
+            const cleanPostalCode = postalCode.replace(/[－ー\-]/g, '');
+
+            // 7桁でない場合は検索しない
+            if (cleanPostalCode.length !== 7) {
+                return;
+            }
+
+            try {
+                // ttskch/jp-postal-code-api を使用して住所を検索
+                const response = await fetch('https://jp-postal-code-api.ttskch.com/api/v1/' + cleanPostalCode + '.json');
+
+                // エラー時は何も表示しない（コンソールにログを出すだけ）
+                if (!response.ok) {
+                    console.error('住所の取得に失敗しました: HTTP ' + response.status);
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.addresses && data.addresses.length > 0) {
+                    if (data.addresses.length === 1) {
+                        // 1つの結果の場合は直接入力
+                        const addr = data.addresses[0].ja;
+                        const address = addr.prefecture + addr.address1 + addr.address2 + (addr.address3 || '');
+                        // 住所フィールドが空の場合のみ自動補完
+                        if (addressField.value.trim() === '') {
+                            addressField.value = address;
+                        }
+                    } else {
+                        // 複数の結果がある場合は選択肢を表示
+                        showAddressChoices(addressFieldId, data.addresses);
+                    }
+                }
+            } catch (error) {
+                // エラーをコンソールに出すだけで、ユーザーには表示しない
+                console.error('住所の取得に失敗しました:', error);
+            }
+        }
+
+        // ページ読み込み後にイベントリスナーを設定
+        document.addEventListener('DOMContentLoaded', function() {
+            // お届け先の郵便番号フィールド
+            const toPostalField = document.getElementById('to_postal');
+            toPostalField.addEventListener('blur', function() {
+                searchAddress(this.value, 'to_address');
+            });
+
+            // ご依頼主の郵便番号フィールド
+            const fromPostalField = document.getElementById('from_postal');
+            fromPostalField.addEventListener('blur', function() {
+                searchAddress(this.value, 'from_address');
+            });
+        });
+    </script>
 </head>
 <body>
     <div class="container">

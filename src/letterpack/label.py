@@ -439,12 +439,10 @@ class LabelGenerator:
         postal_box_offset_y = self.config.spacing.postal_box_offset_y
         dotted_line_text_offset = self.config.spacing.dotted_line_text_offset
 
-        # おところ: / Address
+        # おところ:
         c.setFont(self.font_name, label_font_size)
         c.setFillColorRGB(0, 0, 0)
         c.drawString(x + margin, current_y, "おところ:")
-        c.setFont("Helvetica", label_font_size)
-        c.drawString(x + margin + 35, current_y, "Address")
 
         current_y -= section_spacing
 
@@ -479,12 +477,10 @@ class LabelGenerator:
 
         current_y -= address_name_gap
 
-        # おなまえ: / Name
+        # おなまえ:
         c.setFont(self.font_name, label_font_size)
         c.setFillColorRGB(0, 0, 0)
         c.drawString(x + margin, current_y, "おなまえ:")
-        c.setFont("Helvetica", label_font_size)
-        c.drawString(x + margin + 40, current_y, "Name")
 
         current_y -= section_spacing
 
@@ -508,12 +504,10 @@ class LabelGenerator:
 
         current_y -= name_phone_gap
 
-        # 電話番号: / Telephone Number
+        # 電話番号:
         c.setFont(self.font_name, label_font_size)
         c.setFillColorRGB(0, 0, 0)
         c.drawString(x + margin, current_y, "電話番号:")
-        c.setFont("Helvetica", label_font_size)
-        c.drawString(x + margin + 42, current_y, "Telephone Number")
 
         current_y -= section_spacing
 

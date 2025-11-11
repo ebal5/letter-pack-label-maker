@@ -204,6 +204,12 @@ HTML_TEMPLATE = """
                                placeholder="例: 山田 太郎" required>
                     </div>
                     <div class="form-group">
+                        <label for="to_honorific">敬称</label>
+                        <input type="text" id="to_honorific" name="to_honorific"
+                               placeholder="例: 様、殿、御中、行（未入力でデフォルト「様」）" value="様">
+                        <p class="example">※ 未入力の場合は「様」が使用されます</p>
+                    </div>
+                    <div class="form-group">
                         <label for="to_phone">電話番号 *</label>
                         <input type="text" id="to_phone" name="to_phone"
                                placeholder="例: 03-1234-5678" required>
@@ -226,6 +232,12 @@ HTML_TEMPLATE = """
                         <label for="from_name">氏名 *</label>
                         <input type="text" id="from_name" name="from_name"
                                placeholder="例: 田中 花子" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="from_honorific">敬称</label>
+                        <input type="text" id="from_honorific" name="from_honorific"
+                               placeholder="例: 様、殿、御中、行（未入力で敬称なし）" value="">
+                        <p class="example">※ 未入力の場合は敬称なしになります</p>
                     </div>
                     <div class="form-group">
                         <label for="from_phone">電話番号 *</label>
@@ -275,11 +287,13 @@ def generate_pdf():
         to_postal = request.form.get("to_postal", "").strip()
         to_address = request.form.get("to_address", "").strip()
         to_name = request.form.get("to_name", "").strip()
+        to_honorific = request.form.get("to_honorific", "様").strip()
         to_phone = request.form.get("to_phone", "").strip()
 
         from_postal = request.form.get("from_postal", "").strip()
         from_address = request.form.get("from_address", "").strip()
         from_name = request.form.get("from_name", "").strip()
+        from_honorific = request.form.get("from_honorific", "").strip()
         from_phone = request.form.get("from_phone", "").strip()
 
         # レイアウトモード取得
@@ -287,11 +301,19 @@ def generate_pdf():
 
         # AddressInfo作成（バリデーション含む）
         to_info = AddressInfo(
-            postal_code=to_postal, address=to_address, name=to_name, phone=to_phone
+            postal_code=to_postal,
+            address=to_address,
+            name=to_name,
+            phone=to_phone,
+            honorific=to_honorific,
         )
 
         from_info = AddressInfo(
-            postal_code=from_postal, address=from_address, name=from_name, phone=from_phone
+            postal_code=from_postal,
+            address=from_address,
+            name=from_name,
+            phone=from_phone,
+            honorific=from_honorific,
         )
 
         # レイアウト設定ファイルを一時作成（デフォルト以外の場合のみ）

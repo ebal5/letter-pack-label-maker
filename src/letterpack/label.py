@@ -25,6 +25,7 @@ class AddressInfo:
     address: str  # 住所
     name: str  # 氏名
     phone: str  # 電話番号
+    honorific: Optional[str] = None  # 敬称（Noneまたは空文字列で敬称なし）
 
     def __post_init__(self):
         """バリデーション"""
@@ -542,9 +543,14 @@ class LabelGenerator:
 
         current_y -= address_name_gap
 
-        # 名前記入エリア（点線を短くして「様」のスペースを確保）
-        sama_width = self.config.sama.width * mm
-        name_line_end = x + width - margin - sama_width
+        # 名前記入エリア（敬称がある場合は点線を短くしてスペースを確保）
+        honorific = address.honorific if address.honorific else ""
+        if honorific:
+            sama_width = self.config.sama.width * mm
+            name_line_end = x + width - margin - sama_width
+        else:
+            name_line_end = x + width - margin
+
         self._draw_dotted_line(c, x + margin, current_y, name_line_end)
 
         # 名前を描画
@@ -554,11 +560,12 @@ class LabelGenerator:
             x + margin + dotted_line_text_offset, current_y + dotted_line_text_offset, address.name
         )
 
-        # 「様」を点線の右側に表示
-        c.setFont(self.font_name, name_font_size)
-        c.setFillColorRGB(0, 0, 0)
-        sama_x = name_line_end + self.config.sama.offset * mm
-        c.drawString(sama_x, current_y + dotted_line_text_offset, "様")
+        # 敬称を点線の右側に表示（敬称が指定されている場合のみ）
+        if honorific:
+            c.setFont(self.font_name, name_font_size)
+            c.setFillColorRGB(0, 0, 0)
+            sama_x = name_line_end + self.config.sama.offset * mm
+            c.drawString(sama_x, current_y + dotted_line_text_offset, honorific)
 
         current_y -= name_phone_gap
 

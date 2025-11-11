@@ -11,8 +11,8 @@
 
 - ✅ コマンドラインからPDF生成
 - ✅ Webブラウザからの入力・生成
+- ✅ CSVファイルからの一括生成（4upレイアウト、複数ページ対応）
 - ✅ 静的HTMLページ（サーバー不要、Pyodide使用）
-- 🔜 CSVファイルからの一括生成（予定）
 - 🔜 品名フィールドの追加（予定）
 
 ## インストール
@@ -49,7 +49,23 @@ uv run python -m letterpack.cli --output label.pdf \
   --from-postal "987-6543" \
   --from-address "大阪府大阪市YYY 4-5-6" \
   --from-phone "06-9876-5432"
+
+# CSVファイルから一括生成（4upレイアウト、複数ページ）
+uv run python -m letterpack.cli --csv addresses.csv --output labels.pdf
 ```
+
+#### CSVファイル形式
+
+```csv
+to_postal,to_address,to_name,to_phone,to_honorific,from_postal,from_address,from_name,from_phone,from_honorific
+123-4567,東京都渋谷区XXX 1-2-3,山田太郎,03-1234-5678,様,987-6543,大阪府大阪市YYY 4-5-6,田中花子,06-9876-5432,
+456-7890,神奈川県横浜市ZZZ 7-8-9,佐藤次郎,045-1234-5678,殿,987-6543,大阪府大阪市YYY 4-5-6,田中花子,06-9876-5432,
+```
+
+- ヘッダー行必須
+- 4件ごとに1ページとして生成（5件なら2ページ）
+- `to_honorific`省略時は「様」、`from_honorific`省略時は敬称なし
+- UTF-8またはShift_JISエンコーディング対応
 
 ### Web インターフェース
 
@@ -59,6 +75,10 @@ uv run python -m letterpack.web
 
 # ブラウザで http://localhost:5000 を開く
 ```
+
+Webインターフェースでは以下の機能が利用できます：
+- 単一ラベルの生成（フォーム入力）
+- CSVファイルからの一括生成（ファイルアップロード）
 
 #### 環境変数の設定
 

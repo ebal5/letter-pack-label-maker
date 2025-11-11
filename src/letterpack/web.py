@@ -18,7 +18,8 @@ from flask import (
     url_for,
 )
 
-from .label import AddressInfo, create_label
+from .csv_parser import parse_csv
+from .label import AddressInfo, create_label, create_label_batch
 
 app = Flask(__name__)
 
@@ -38,7 +39,7 @@ app.secret_key = secret_key
 
 
 # HTMLテンプレート
-HTML_TEMPLATE = """
+HTML_TEMPLATE = r"""
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -167,7 +168,179 @@ HTML_TEMPLATE = """
             color: #999;
             margin-top: 4px;
         }
+        .loading {
+            color: #667eea;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .address-choices {
+            margin-top: 8px;
+            padding: 12px;
+            background: #f0f0f0;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+        .address-choice-button {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            text-align: left;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .address-choice-button:hover {
+            background: #f8f9fa;
+            border-color: #667eea;
+            transform: translateX(4px);
+        }
+        .address-choice-close {
+            display: block;
+            width: 100%;
+            padding: 8px;
+            background: #999;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .address-choice-close:hover {
+            background: #777;
+        }
+        .address-choice-label {
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
     </style>
+    <script>
+        // 複数の住所候補がある場合に選択肢を表示する関数
+        function showAddressChoices(addressFieldId, addresses) {
+            // 既存の選択肢があれば削除
+            const existingChoices = document.getElementById(addressFieldId + '_choices');
+            if (existingChoices) {
+                existingChoices.remove();
+            }
+
+            const addressField = document.getElementById(addressFieldId);
+            const container = addressField.parentElement;
+
+            // 選択肢を表示するコンテナを作成
+            const choicesDiv = document.createElement('div');
+            choicesDiv.id = addressFieldId + '_choices';
+            choicesDiv.className = 'address-choices';
+
+            // ラベルを追加
+            const label = document.createElement('div');
+            label.className = 'address-choice-label';
+            label.textContent = '複数の住所が見つかりました。選択してください：';
+            choicesDiv.appendChild(label);
+
+            // 各住所の選択ボタンを作成
+            addresses.forEach(function(addr) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'address-choice-button';
+                const fullAddress = addr.ja.prefecture + addr.ja.address1 + addr.ja.address2 + (addr.ja.address3 || '');
+                button.textContent = fullAddress;
+                button.onclick = function() {
+                    addressField.value = fullAddress;
+                    choicesDiv.remove();
+                };
+                choicesDiv.appendChild(button);
+            });
+
+            // 閉じるボタンを追加
+            const closeButton = document.createElement('button');
+            closeButton.type = 'button';
+            closeButton.className = 'address-choice-close';
+            closeButton.textContent = '✕ 閉じる';
+            closeButton.onclick = function() {
+                choicesDiv.remove();
+            };
+            choicesDiv.appendChild(closeButton);
+
+            container.appendChild(choicesDiv);
+        }
+
+        // 郵便番号から住所を自動補完する関数
+        async function searchAddress(postalCode, addressFieldId) {
+            // 住所フィールドの要素を取得
+            const addressField = document.getElementById(addressFieldId);
+
+            // 住所が既に入力されている場合は何もしない
+            if (addressField.value.trim() !== '') {
+                return;
+            }
+
+            // 既存の選択肢があれば削除
+            const existingChoices = document.getElementById(addressFieldId + '_choices');
+            if (existingChoices) {
+                existingChoices.remove();
+            }
+
+            // 郵便番号のフォーマットをクリーンアップ（ハイフンを除去）
+            const cleanPostalCode = postalCode.replace(/[－ー\-]/g, '');
+
+            // 7桁でない場合は検索しない
+            if (cleanPostalCode.length !== 7) {
+                return;
+            }
+
+            try {
+                // ttskch/jp-postal-code-api を使用して住所を検索
+                const response = await fetch('https://jp-postal-code-api.ttskch.com/api/v1/' + cleanPostalCode + '.json');
+
+                // エラー時は何も表示しない（コンソールにログを出すだけ）
+                if (!response.ok) {
+                    console.error('住所の取得に失敗しました: HTTP ' + response.status);
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.addresses && data.addresses.length > 0) {
+                    if (data.addresses.length === 1) {
+                        // 1つの結果の場合は直接入力
+                        const addr = data.addresses[0].ja;
+                        const address = addr.prefecture + addr.address1 + addr.address2 + (addr.address3 || '');
+                        // 住所フィールドが空の場合のみ自動補完
+                        if (addressField.value.trim() === '') {
+                            addressField.value = address;
+                        }
+                    } else {
+                        // 複数の結果がある場合は選択肢を表示
+                        showAddressChoices(addressFieldId, data.addresses);
+                    }
+                }
+            } catch (error) {
+                // エラーをコンソールに出すだけで、ユーザーには表示しない
+                console.error('住所の取得に失敗しました:', error);
+            }
+        }
+
+        // ページ読み込み後にイベントリスナーを設定
+        document.addEventListener('DOMContentLoaded', function() {
+            // お届け先の郵便番号フィールド
+            const toPostalField = document.getElementById('to_postal');
+            toPostalField.addEventListener('blur', function() {
+                searchAddress(this.value, 'to_address');
+            });
+
+            // ご依頼主の郵便番号フィールド
+            const fromPostalField = document.getElementById('from_postal');
+            fromPostalField.addEventListener('blur', function() {
+                searchAddress(this.value, 'from_address');
+            });
+        });
+    </script>
 </head>
 <body>
     <div class="container">
@@ -262,6 +435,33 @@ HTML_TEMPLATE = """
                     <button type="submit">📄 PDFを生成</button>
                 </div>
             </form>
+
+            <div style="margin-top: 40px; padding-top: 40px; border-top: 2px solid #e0e0e0;">
+                <h2 style="text-align: center; color: #667eea; margin-bottom: 30px;">📊 CSVファイルからの一括生成</h2>
+
+                <form method="POST" action="{{ url_for('generate_csv') }}" enctype="multipart/form-data">
+                    <div class="section">
+                        <h2>CSVファイルをアップロード</h2>
+                        <div class="form-group">
+                            <label for="csv_file">CSVファイル *</label>
+                            <input type="file" id="csv_file" name="csv_file" accept=".csv" required
+                                   style="padding: 10px; border: 2px dashed #667eea; border-radius: 6px; background: #f8f9fa;">
+                            <p class="example" style="margin-top: 8px;">
+                                ※ CSV形式: to_postal, to_address, to_name, to_phone, to_honorific, from_postal, from_address, from_name, from_phone, from_honorific
+                            </p>
+                            <p class="example">
+                                ※ 4件ごとに1ページとして、複数ページのPDFを生成します
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="btn-container">
+                        <button type="submit" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                            📊 CSVから一括生成
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <footer>
@@ -366,6 +566,83 @@ def generate_pdf():
         return redirect(url_for("index"))
     except Exception as e:
         flash(f"PDF生成エラー: {e}", "error")
+        return redirect(url_for("index"))
+
+
+@app.route("/generate_csv", methods=["POST"])
+def generate_csv():
+    """CSVからの一括PDF生成処理"""
+    try:
+        # ファイルアップロードの確認
+        if "csv_file" not in request.files:
+            flash("CSVファイルがアップロードされていません", "error")
+            return redirect(url_for("index"))
+
+        csv_file = request.files["csv_file"]
+
+        # ファイル名が空でないか確認
+        if csv_file.filename == "":
+            flash("CSVファイルが選択されていません", "error")
+            return redirect(url_for("index"))
+
+        # 一時ファイルに保存
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_csv:
+            csv_file.save(tmp_csv.name)
+            csv_path = tmp_csv.name
+
+        try:
+            # CSVを読み込み＆バリデーション
+            labels = parse_csv(csv_path)
+
+            # (to_address, from_address) のタプルのリストに変換
+            label_pairs = [(label.to_address, label.from_address) for label in labels]
+
+            # 一時ファイルにPDF生成
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                output_path = tmp_file.name
+
+            create_label_batch(label_pairs, output_path)
+
+            # レスポンス送信後に一時ファイルを削除するコールバックを登録
+            @after_this_request
+            def remove_temp_files(response):
+                try:
+                    os.remove(output_path)
+                except Exception as e:
+                    print(
+                        f"警告: 一時ファイルの削除に失敗: {output_path}, エラー: {e}",
+                        file=sys.stderr,
+                    )
+                try:
+                    os.remove(csv_path)
+                except Exception as e:
+                    print(
+                        f"警告: 一時CSVファイルの削除に失敗: {csv_path}, エラー: {e}",
+                        file=sys.stderr,
+                    )
+                return response
+
+            # PDFを送信
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name="letterpack_labels_batch.pdf",
+                mimetype="application/pdf",
+            )
+
+        finally:
+            # エラーが発生した場合もCSVファイルは削除
+            if os.path.exists(csv_path):
+                import contextlib
+
+                with contextlib.suppress(Exception):
+                    os.remove(csv_path)
+
+    except ValueError as e:
+        flash(f"CSV検証エラー: {e}", "error")
+        return redirect(url_for("index"))
+    except Exception as e:
+        flash(f"CSV処理エラー: {e}", "error")
         return redirect(url_for("index"))
 
 

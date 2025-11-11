@@ -44,8 +44,8 @@ class AddressInfo:
 class LayoutConfig(BaseModel):
     """ラベルの基本寸法設定"""
 
-    label_width: float = Field(default=148, gt=0, le=300, description="ラベルの幅 (mm)")
-    label_height: float = Field(default=210, gt=0, le=500, description="ラベルの高さ (mm)")
+    label_width: float = Field(default=105, gt=0, le=300, description="ラベルの幅 (mm)")
+    label_height: float = Field(default=148, gt=0, le=500, description="ラベルの高さ (mm)")
     margin: float = Field(default=8, ge=0, le=50, description="セクション内のマージン (mm)")
     draw_border: bool = Field(default=True, description="デバッグ用の枠線を描画するか")
 

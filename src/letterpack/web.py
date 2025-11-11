@@ -291,7 +291,9 @@ def generate_pdf():
                 os.remove(output_path)
             except Exception as e:
                 # ログに記録するが、エラーを無視してレスポンスは返す
-                print(f"警告: 一時ファイルの削除に失敗: {output_path}, エラー: {e}", file=sys.stderr)
+                print(
+                    f"警告: 一時ファイルの削除に失敗: {output_path}, エラー: {e}", file=sys.stderr
+                )
             return response
 
         # PDFを送信

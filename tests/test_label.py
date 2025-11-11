@@ -9,7 +9,6 @@ import tempfile
 
 import pytest
 import yaml
-from pydantic import ValidationError
 
 from letterpack.label import AddressInfo, LabelGenerator, create_label, load_layout_config
 
@@ -122,8 +121,8 @@ def test_load_default_config():
     """デフォルト設定の読み込みテスト"""
     config = load_layout_config(None)
     assert config is not None
-    assert config.layout.label_width == 148
-    assert config.layout.label_height == 210
+    assert config.layout.label_width == 105
+    assert config.layout.label_height == 148
     assert config.layout.margin == 8
     assert config.fonts.label == 9
     assert config.fonts.postal_code == 10
@@ -170,7 +169,7 @@ def test_load_empty_config():
     try:
         config = load_layout_config(config_path)
         # 空のファイルの場合はデフォルト設定が使用される
-        assert config.layout.label_width == 148
+        assert config.layout.label_width == 105
         assert config.fonts.label == 9
     finally:
         if os.path.exists(config_path):
@@ -250,7 +249,7 @@ def test_label_generator_with_custom_config():
         assert generator.config.layout.margin == 12
         assert generator.config.fonts.name == 16
         # デフォルト値も正しく設定されているか確認
-        assert generator.config.layout.label_width == 148
+        assert generator.config.layout.label_width == 105
     finally:
         if os.path.exists(config_path):
             os.remove(config_path)

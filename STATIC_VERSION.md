@@ -62,26 +62,40 @@ Blobオブジェクトを作成してダウンロード
 
 ### 3. フォント処理
 
-既存のPythonコード（`label.py`）はファイルシステムから日本語フォントを読み込む仕様でしたが、Pyodide環境では以下のように簡素化しています：
+**Noto Sans JP**をGoogle Fontsから自動的にダウンロードして使用します：
 
-```python
-# ReportLabのCJKフォントを使用（フォールバック方式）
-try:
-    pdfmetrics.registerFont(UnicodeCIDFont("HeiseiMin-W3"))
-    self.font_name = "HeiseiMin-W3"
-except:
-    try:
-        pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
-        self.font_name = "HeiseiKakuGo-W5"
-    except:
-        self.font_name = "Helvetica"  # 最終フォールバック
+```javascript
+// 初期化時にNoto Sans JPフォントをダウンロード
+const fontUrl = 'https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEi75vY0rw-oME.ttf';
+const fontResponse = await fetch(fontUrl);
+const fontArrayBuffer = await fontResponse.arrayBuffer();
+const fontBytes = new Uint8Array(fontArrayBuffer);
+
+// Pyodideの仮想ファイルシステムに保存
+pyodide.FS.writeFile('/NotoSansJP-Regular.ttf', fontBytes);
 ```
 
-#### フォントの制限事項
+Pythonコード側では、ダウンロードされたフォントを登録：
 
-- IPAフォントは使用できない（ファイルシステムへのアクセスが必要）
-- HeiseiMin-W3 または HeiseiKakuGo-W5 を使用
-- 一部の記号や特殊文字が表示されない可能性がある
+```python
+# Noto Sans JPフォントを優先的に使用
+if font_path:
+    try:
+        pdfmetrics.registerFont(TTFont("NotoSansJP", font_path))
+        self.font_name = "NotoSansJP"
+    except Exception as e:
+        print(f"Noto Sans JPの登録に失敗: {e}")
+        self._fallback_font()
+else:
+    self._fallback_font()
+```
+
+#### フォント選択の優先順位
+
+1. **Noto Sans JP** (推奨) - Google Fontsから自動ダウンロード
+2. **HeiseiMin-W3** (フォールバック) - ReportLabのCJKフォント
+3. **HeiseiKakuGo-W5** (フォールバック) - ReportLabのCJKフォント
+4. **Helvetica** (最終フォールバック) - 日本語非対応
 
 ## 使い方
 
@@ -117,10 +131,11 @@ open http://localhost:8000/index_static.html
 ### 初回ロード
 - Pyodideのダウンロード: 約10MB
 - ReportLabのインストール: 約2MB
-- 合計時間: 10-30秒（ネットワーク速度に依存）
+- Noto Sans JPフォントのダウンロード: 約2MB
+- **合計時間: 15-40秒**（ネットワーク速度に依存）
 
 ### 2回目以降
-- ブラウザのキャッシュを使用
+- ブラウザのキャッシュを使用（Pyodide、ReportLab、フォント）
 - 初期化時間: 2-5秒
 - PDF生成時間: 1-2秒
 
@@ -160,12 +175,13 @@ open http://localhost:8000/index_static.html
 **症状**: PDFで日本語が文字化けまたは空白になる
 
 **原因**:
-- HeiseiMin-W3フォントがサポートしていない文字を使用
+- Noto Sans JPフォントのダウンロードに失敗した
+- フォールバックフォント（HeiseiMin-W3など）がサポートしていない文字を使用
 
 **対処法**:
-- 別のフォント（HeiseiKakuGo-W5）を試す
-- 特殊な記号を避ける
-- サーバー版（Flask）を使用する（IPAフォントをサポート）
+1. ブラウザのコンソールを開いて「Noto Sans JPフォントのダウンロード完了」メッセージを確認
+2. フォントのダウンロードに失敗している場合は、ページを再読み込み
+3. それでも解決しない場合は、サーバー版（Flask）を使用する（IPAフォントをサポート）
 
 ## ブラウザ互換性
 
@@ -192,13 +208,15 @@ open http://localhost:8000/index_static.html
 ## 将来の改善案
 
 ### フォント改善
-- カスタムフォント（IPAフォントなど）をWebから読み込む
-- Pyodide FSでフォントファイルを配置
+- ✅ **完了**: Noto Sans JPフォントの自動ダウンロード
+- Noto Sans JP Bold（太字）の追加
+- フォントウェイトの選択機能
 
 ### パフォーマンス最適化
 - Service Workerでオフライン対応を強化
 - Pyodideの遅延ロード
 - WebWorkerで処理をバックグラウンド化
+- フォントのサブセット化（ファイルサイズ削減）
 
 ### 機能追加
 - 複数ラベルの一括生成

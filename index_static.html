@@ -259,7 +259,7 @@
         let pyodide = null;
         let pythonInitialized = false;
 
-        // Python label生成コード（簡略版 - フォント処理を簡素化）
+        // Python label生成コード（Noto Sans JP使用版）
         const labelPythonCode = `
 from dataclasses import dataclass
 from typing import Optional
@@ -269,6 +269,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 
 @dataclass
@@ -290,8 +291,22 @@ class AddressInfo:
             raise ValueError("電話番号は必須です")
 
 class LabelGenerator:
-    def __init__(self, layout_mode="center"):
-        # Pyodide環境用にフォントを簡素化
+    def __init__(self, layout_mode="center", font_path=None):
+        # Noto Sans JPフォントを優先的に使用
+        if font_path:
+            try:
+                pdfmetrics.registerFont(TTFont("NotoSansJP", font_path))
+                self.font_name = "NotoSansJP"
+            except Exception as e:
+                print(f"Noto Sans JPの登録に失敗: {e}")
+                self._fallback_font()
+        else:
+            self._fallback_font()
+
+        self.layout_mode = layout_mode
+
+    def _fallback_font(self):
+        """フォールバック処理"""
         try:
             pdfmetrics.registerFont(UnicodeCIDFont("HeiseiMin-W3"))
             self.font_name = "HeiseiMin-W3"
@@ -301,8 +316,6 @@ class LabelGenerator:
                 self.font_name = "HeiseiKakuGo-W5"
             except:
                 self.font_name = "Helvetica"
-
-        self.layout_mode = layout_mode
 
     def generate(self, to_address, from_address):
         buffer = BytesIO()
@@ -463,8 +476,8 @@ class LabelGenerator:
 
         return lines
 
-def create_label_bytes(to_info, from_info, layout_mode="center"):
-    generator = LabelGenerator(layout_mode=layout_mode)
+def create_label_bytes(to_info, from_info, layout_mode="center", font_path=None):
+    generator = LabelGenerator(layout_mode=layout_mode, font_path=font_path)
     return generator.generate(to_info, from_info)
 `;
 
@@ -502,6 +515,23 @@ def create_label_bytes(to_info, from_info, layout_mode="center"):
                     import micropip
                     await micropip.install('reportlab')
                 `);
+
+                loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> Noto Sans JPフォントをダウンロード中...';
+
+                // Noto Sans JPフォントをGoogle Fontsからダウンロード
+                try {
+                    const fontUrl = 'https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEi75vY0rw-oME.ttf';
+                    const fontResponse = await fetch(fontUrl);
+                    const fontArrayBuffer = await fontResponse.arrayBuffer();
+                    const fontBytes = new Uint8Array(fontArrayBuffer);
+
+                    // Pyodideの仮想ファイルシステムに保存
+                    pyodide.FS.writeFile('/NotoSansJP-Regular.ttf', fontBytes);
+
+                    console.log('Noto Sans JPフォントのダウンロード完了');
+                } catch (fontError) {
+                    console.warn('Noto Sans JPのダウンロードに失敗、フォールバックを使用:', fontError);
+                }
 
                 loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> Python コードをロード中...';
 
@@ -567,7 +597,11 @@ from_info = AddressInfo(
     honorific=form_data['from_honorific'] if form_data['from_honorific'] else None
 )
 
-pdf_bytes = create_label_bytes(to_info, from_info, form_data['layout_mode'])
+# Noto Sans JPフォントが利用可能かチェック
+import os
+font_path = '/NotoSansJP-Regular.ttf' if os.path.exists('/NotoSansJP-Regular.ttf') else None
+
+pdf_bytes = create_label_bytes(to_info, from_info, form_data['layout_mode'], font_path=font_path)
 pdf_bytes
                 `);
 

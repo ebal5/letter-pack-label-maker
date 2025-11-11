@@ -18,7 +18,8 @@ from flask import (
     url_for,
 )
 
-from .label import AddressInfo, create_label
+from .csv_parser import parse_csv
+from .label import AddressInfo, create_label, create_label_batch
 
 app = Flask(__name__)
 
@@ -434,6 +435,33 @@ HTML_TEMPLATE = r"""
                     <button type="submit">📄 PDFを生成</button>
                 </div>
             </form>
+
+            <div style="margin-top: 40px; padding-top: 40px; border-top: 2px solid #e0e0e0;">
+                <h2 style="text-align: center; color: #667eea; margin-bottom: 30px;">📊 CSVファイルからの一括生成</h2>
+
+                <form method="POST" action="{{ url_for('generate_csv') }}" enctype="multipart/form-data">
+                    <div class="section">
+                        <h2>CSVファイルをアップロード</h2>
+                        <div class="form-group">
+                            <label for="csv_file">CSVファイル *</label>
+                            <input type="file" id="csv_file" name="csv_file" accept=".csv" required
+                                   style="padding: 10px; border: 2px dashed #667eea; border-radius: 6px; background: #f8f9fa;">
+                            <p class="example" style="margin-top: 8px;">
+                                ※ CSV形式: to_postal, to_address, to_name, to_phone, to_honorific, from_postal, from_address, from_name, from_phone, from_honorific
+                            </p>
+                            <p class="example">
+                                ※ 4件ごとに1ページとして、複数ページのPDFを生成します
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="btn-container">
+                        <button type="submit" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                            📊 CSVから一括生成
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
 
         <footer>
@@ -538,6 +566,83 @@ def generate_pdf():
         return redirect(url_for("index"))
     except Exception as e:
         flash(f"PDF生成エラー: {e}", "error")
+        return redirect(url_for("index"))
+
+
+@app.route("/generate_csv", methods=["POST"])
+def generate_csv():
+    """CSVからの一括PDF生成処理"""
+    try:
+        # ファイルアップロードの確認
+        if "csv_file" not in request.files:
+            flash("CSVファイルがアップロードされていません", "error")
+            return redirect(url_for("index"))
+
+        csv_file = request.files["csv_file"]
+
+        # ファイル名が空でないか確認
+        if csv_file.filename == "":
+            flash("CSVファイルが選択されていません", "error")
+            return redirect(url_for("index"))
+
+        # 一時ファイルに保存
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp_csv:
+            csv_file.save(tmp_csv.name)
+            csv_path = tmp_csv.name
+
+        try:
+            # CSVを読み込み＆バリデーション
+            labels = parse_csv(csv_path)
+
+            # (to_address, from_address) のタプルのリストに変換
+            label_pairs = [(label.to_address, label.from_address) for label in labels]
+
+            # 一時ファイルにPDF生成
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+                output_path = tmp_file.name
+
+            create_label_batch(label_pairs, output_path)
+
+            # レスポンス送信後に一時ファイルを削除するコールバックを登録
+            @after_this_request
+            def remove_temp_files(response):
+                try:
+                    os.remove(output_path)
+                except Exception as e:
+                    print(
+                        f"警告: 一時ファイルの削除に失敗: {output_path}, エラー: {e}",
+                        file=sys.stderr,
+                    )
+                try:
+                    os.remove(csv_path)
+                except Exception as e:
+                    print(
+                        f"警告: 一時CSVファイルの削除に失敗: {csv_path}, エラー: {e}",
+                        file=sys.stderr,
+                    )
+                return response
+
+            # PDFを送信
+            return send_file(
+                output_path,
+                as_attachment=True,
+                download_name="letterpack_labels_batch.pdf",
+                mimetype="application/pdf",
+            )
+
+        finally:
+            # エラーが発生した場合もCSVファイルは削除
+            if os.path.exists(csv_path):
+                import contextlib
+
+                with contextlib.suppress(Exception):
+                    os.remove(csv_path)
+
+    except ValueError as e:
+        flash(f"CSV検証エラー: {e}", "error")
+        return redirect(url_for("index"))
+    except Exception as e:
+        flash(f"CSV処理エラー: {e}", "error")
         return redirect(url_for("index"))
 
 

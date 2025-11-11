@@ -300,3 +300,109 @@ def test_center_layout_default():
     """中央配置レイアウト（デフォルト）のテスト"""
     config = load_layout_config(None)
     assert config.layout.layout_mode == "center"
+
+
+def test_create_label_batch():
+    """複数ラベルの一括生成テスト"""
+    # テスト用の複数ラベルを作成
+    label_pairs = [
+        (
+            AddressInfo(
+                postal_code="123-4567",
+                address="東京都渋谷区XXX 1-2-3",
+                name="山田太郎",
+                phone="03-1234-5678",
+                honorific="様",
+            ),
+            AddressInfo(
+                postal_code="987-6543",
+                address="大阪府大阪市YYY 4-5-6",
+                name="田中花子",
+                phone="06-9876-5432",
+            ),
+        ),
+        (
+            AddressInfo(
+                postal_code="456-7890",
+                address="神奈川県横浜市ZZZ 7-8-9",
+                name="佐藤次郎",
+                phone="045-1234-5678",
+                honorific="殿",
+            ),
+            AddressInfo(
+                postal_code="987-6543",
+                address="大阪府大阪市YYY 4-5-6",
+                name="田中花子",
+                phone="06-9876-5432",
+            ),
+        ),
+        (
+            AddressInfo(
+                postal_code="111-2222",
+                address="千葉県千葉市AAA 1-1-1",
+                name="鈴木三郎",
+                phone="043-1111-2222",
+                honorific="御中",
+            ),
+            AddressInfo(
+                postal_code="987-6543",
+                address="大阪府大阪市YYY 4-5-6",
+                name="田中花子",
+                phone="06-9876-5432",
+            ),
+        ),
+    ]
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        output_path = tmp_pdf.name
+
+    try:
+        from letterpack.label import create_label_batch
+
+        result = create_label_batch(label_pairs, output_path)
+        assert os.path.exists(result)
+        assert os.path.getsize(result) > 0
+
+        # CI環境用にPDFを保存
+        save_to_test_output(result)
+    finally:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+
+def test_create_label_batch_5_labels():
+    """5件のラベルで2ページ生成のテスト"""
+    label_pairs = []
+    for i in range(5):
+        label_pairs.append(
+            (
+                AddressInfo(
+                    postal_code=f"{100 + i}-0001",
+                    address=f"東京都千代田区{i}-{i}-{i}",
+                    name=f"テスト{i}",
+                    phone=f"03-0000-000{i}",
+                ),
+                AddressInfo(
+                    postal_code="999-9999",
+                    address="送信元住所",
+                    name="送信元",
+                    phone="099-9999-9999",
+                ),
+            )
+        )
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        output_path = tmp_pdf.name
+
+    try:
+        from letterpack.label import create_label_batch
+
+        result = create_label_batch(label_pairs, output_path)
+        assert os.path.exists(result)
+        assert os.path.getsize(result) > 0
+
+        # CI環境用にPDFを保存
+        save_to_test_output(result)
+    finally:
+        if os.path.exists(output_path):
+            os.remove(output_path)

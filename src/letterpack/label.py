@@ -61,7 +61,7 @@ class FontsConfig(BaseModel):
     postal_code: int = Field(default=13, gt=0, le=72, description="郵便番号のフォントサイズ (pt)")
     address: int = Field(default=11, gt=0, le=72, description="住所のフォントサイズ (pt)")
     name: int = Field(default=14, gt=0, le=72, description="氏名のフォントサイズ (pt)")
-    phone: int = Field(default=11, gt=0, le=72, description="電話番号のフォントサイズ (pt)")
+    phone: int = Field(default=13, gt=0, le=72, description="電話番号のフォントサイズ (pt)")
 
 
 class SpacingConfig(BaseModel):

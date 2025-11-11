@@ -14,7 +14,7 @@ fonts:
   postal_code: 10  # 郵便番号
   address: 11  # 住所
   name: 14  # 氏名
-  phone: 11  # 電話番号
+  phone: 10  # 電話番号（郵便番号と同じサイズに調整）
 
 # 要素間のスペーシング（px単位）
 spacing:

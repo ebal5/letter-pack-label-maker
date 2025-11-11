@@ -69,7 +69,7 @@ class SpacingConfig(BaseModel):
     section_spacing: int = Field(default=15, ge=0, le=100, description="セクション間の間隔 (px)")
     address_line_height: int = Field(default=18, ge=0, le=100, description="住所の行間 (px)")
     address_name_gap: int = Field(
-        default=8, ge=0, le=100, description="住所と名前セクションの間隔 (px)"
+        default=27, ge=0, le=100, description="住所と名前セクションの間隔 (px)"
     )
     name_phone_gap: int = Field(
         default=18, ge=0, le=100, description="名前と電話番号セクションの間隔 (px)"

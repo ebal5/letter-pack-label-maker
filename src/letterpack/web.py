@@ -6,6 +6,7 @@ import os
 import sys
 import tempfile
 
+import yaml
 from flask import (
     Flask,
     after_this_request,
@@ -233,6 +234,18 @@ HTML_TEMPLATE = """
                     </div>
                 </div>
 
+                <div class="section">
+                    <h2>⚙️ レイアウト設定</h2>
+                    <div class="form-group">
+                        <label for="layout_mode">レイアウトモード</label>
+                        <select id="layout_mode" name="layout_mode">
+                            <option value="center">中央配置（1枚）</option>
+                            <option value="grid_4up">4丁付（2×2グリッド、同じラベル4枚）</option>
+                        </select>
+                        <p class="example">※ 4丁付を選択すると、A4用紙に同じラベルが4つ印刷されます</p>
+                    </div>
+                </div>
+
                 <div class="btn-container">
                     <button type="submit">📄 PDFを生成</button>
                 </div>
@@ -269,6 +282,9 @@ def generate_pdf():
         from_name = request.form.get("from_name", "").strip()
         from_phone = request.form.get("from_phone", "").strip()
 
+        # レイアウトモード取得
+        layout_mode = request.form.get("layout_mode", "center").strip()
+
         # AddressInfo作成（バリデーション含む）
         to_info = AddressInfo(
             postal_code=to_postal, address=to_address, name=to_name, phone=to_phone
@@ -278,11 +294,21 @@ def generate_pdf():
             postal_code=from_postal, address=from_address, name=from_name, phone=from_phone
         )
 
+        # レイアウト設定ファイルを一時作成（デフォルト以外の場合のみ）
+        config_path = None
+        if layout_mode != "center":
+            with tempfile.NamedTemporaryFile(
+                mode="w", delete=False, suffix=".yaml", encoding="utf-8"
+            ) as tmp_config:
+                config_data = {"layout": {"layout_mode": layout_mode}}
+                yaml.dump(config_data, tmp_config)
+                config_path = tmp_config.name
+
         # 一時ファイルにPDF生成
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
             output_path = tmp_file.name
 
-        create_label(to_info, from_info, output_path)
+        create_label(to_info, from_info, output_path, config_path=config_path)
 
         # レスポンス送信後に一時ファイルを削除するコールバックを登録
         @after_this_request
@@ -291,7 +317,18 @@ def generate_pdf():
                 os.remove(output_path)
             except Exception as e:
                 # ログに記録するが、エラーを無視してレスポンスは返す
-                print(f"警告: 一時ファイルの削除に失敗: {output_path}, エラー: {e}", file=sys.stderr)
+                print(
+                    f"警告: 一時ファイルの削除に失敗: {output_path}, エラー: {e}", file=sys.stderr
+                )
+            # 設定ファイルも削除
+            if config_path:
+                try:
+                    os.remove(config_path)
+                except Exception as e:
+                    print(
+                        f"警告: 一時設定ファイルの削除に失敗: {config_path}, エラー: {e}",
+                        file=sys.stderr,
+                    )
             return response
 
         # PDFを送信

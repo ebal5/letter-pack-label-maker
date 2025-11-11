@@ -89,6 +89,11 @@ def main():
     # フォント
     parser.add_argument("--font", help="日本語フォントファイルのパス（.ttf）")
 
+    # 設定ファイル
+    parser.add_argument(
+        "--config", help="レイアウト設定ファイルのパス（.yaml）。4丁付レイアウトなどの設定が可能"
+    )
+
     args = parser.parse_args()
 
     # 引数チェック: 全て指定されているか、全て未指定か
@@ -128,7 +133,11 @@ def main():
         # PDF生成
         print(f"\nPDFを生成中: {output_path}")
         result_path = create_label(
-            to_address=to_info, from_address=from_info, output_path=output_path, font_path=args.font
+            to_address=to_info,
+            from_address=from_info,
+            output_path=output_path,
+            font_path=args.font,
+            config_path=args.config,
         )
 
         print(f"✓ PDFを生成しました: {result_path}")

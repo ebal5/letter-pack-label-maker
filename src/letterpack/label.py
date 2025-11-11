@@ -91,6 +91,9 @@ class PostalBoxConfig(BaseModel):
     box_size: float = Field(default=5, gt=0, le=20, description="ボックスのサイズ (mm)")
     box_spacing: float = Field(default=1, ge=0, le=10, description="ボックス間の間隔 (mm)")
     line_width: float = Field(default=0.5, gt=0, le=5, description="枠線の太さ (pt)")
+    text_vertical_offset: float = Field(
+        default=2, ge=-10, le=10, description="数字の垂直オフセット (pt)"
+    )
 
 
 class AddressLayoutConfig(BaseModel):
@@ -391,6 +394,7 @@ class LabelGenerator:
         box_size = self.config.postal_box.box_size * mm
         box_spacing = self.config.postal_box.box_spacing * mm
         box_line_width = self.config.postal_box.line_width
+        text_vertical_offset = self.config.postal_box.text_vertical_offset
         postal_font_size = self.config.fonts.postal_code
 
         # 太字フォントを使用（利用可能な場合）
@@ -405,13 +409,13 @@ class LabelGenerator:
             # ボックスの枠
             c.rect(box_x, y, box_size, box_size)
 
-            # 数字を中央に描画
+            # 数字を中央に描画（垂直オフセット付き）
             if i < len(digits):
                 c.setFont(bold_font_name, postal_font_size)
                 # 文字を中央揃え
                 text_width = c.stringWidth(digits[i], bold_font_name, postal_font_size)
                 text_x = box_x + (box_size - text_width) / 2
-                text_y = y + (box_size - postal_font_size) / 2
+                text_y = y + (box_size - postal_font_size) / 2 + text_vertical_offset
                 c.drawString(text_x, text_y, digits[i])
 
         # 区切り線（ハイフン）を描画
@@ -428,14 +432,14 @@ class LabelGenerator:
             # ボックスの枠
             c.rect(box_x, y, box_size, box_size)
 
-            # 数字を中央に描画
+            # 数字を中央に描画（垂直オフセット付き）
             digit_index = i + 3
             if digit_index < len(digits):
                 c.setFont(bold_font_name, postal_font_size)
                 # 文字を中央揃え
                 text_width = c.stringWidth(digits[digit_index], bold_font_name, postal_font_size)
                 text_x = box_x + (box_size - text_width) / 2
-                text_y = y + (box_size - postal_font_size) / 2
+                text_y = y + (box_size - postal_font_size) / 2 + text_vertical_offset
                 c.drawString(text_x, text_y, digits[digit_index])
 
         # 線の太さをリセット

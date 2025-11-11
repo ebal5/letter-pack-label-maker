@@ -130,6 +130,7 @@ def test_load_default_config():
     assert config.fonts.name == 14
     assert config.fonts.phone == 11
     assert config.postal_box.line_width == 0.5
+    assert config.postal_box.text_vertical_offset == 2
     assert config.spacing.postal_box_offset_y == -2
 
 

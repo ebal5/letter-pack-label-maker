@@ -25,7 +25,7 @@ class AddressInfo:
     address: str  # 住所
     name: str  # 氏名
     phone: str  # 電話番号
-    honorific: Optional[str] = "様"  # 敬称（デフォルト: "様"、空文字列で敬称なし）
+    honorific: Optional[str] = None  # 敬称（Noneまたは空文字列で敬称なし）
 
     def __post_init__(self):
         """バリデーション"""
@@ -37,9 +37,6 @@ class AddressInfo:
             raise ValueError("氏名は必須です")
         if not self.phone:
             raise ValueError("電話番号は必須です")
-        # honorificがNoneの場合は"様"をデフォルトとして設定
-        if self.honorific is None:
-            self.honorific = "様"
 
 
 # レイアウト設定のPydanticモデル

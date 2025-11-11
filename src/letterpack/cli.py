@@ -34,9 +34,8 @@ def interactive_input() -> tuple[AddressInfo, AddressInfo, str]:
     from_postal = input("郵便番号（例: 987-6543）: ").strip()
     from_address = input("住所: ").strip()
     from_name = input("氏名: ").strip()
-    from_honorific = input("敬称（例: 様、殿、御中、行）※未入力でデフォルト「様」: ").strip()
-    if not from_honorific:
-        from_honorific = "様"
+    from_honorific = input("敬称（例: 様、殿、御中、行）※未入力で敬称なし: ").strip()
+    # 未入力の場合は空文字列（敬称なし）
     from_phone = input("電話番号: ").strip()
     print()
 
@@ -95,18 +94,14 @@ def main():
     parser.add_argument("--to-postal", help="お届け先 郵便番号")
     parser.add_argument("--to-address", help="お届け先 住所")
     parser.add_argument("--to-phone", help="お届け先 電話番号")
-    parser.add_argument(
-        "--to-honorific", default="様", help="お届け先 敬称（デフォルト: 様）※空文字列で敬称なし"
-    )
+    parser.add_argument("--to-honorific", default="様", help="お届け先 敬称（デフォルト: 様）")
 
     # ご依頼主
     parser.add_argument("--from-name", help="ご依頼主 氏名")
     parser.add_argument("--from-postal", help="ご依頼主 郵便番号")
     parser.add_argument("--from-address", help="ご依頼主 住所")
     parser.add_argument("--from-phone", help="ご依頼主 電話番号")
-    parser.add_argument(
-        "--from-honorific", default="様", help="ご依頼主 敬称（デフォルト: 様）※空文字列で敬称なし"
-    )
+    parser.add_argument("--from-honorific", default="", help="ご依頼主 敬称（デフォルト: なし）")
 
     # フォント
     parser.add_argument("--font", help="日本語フォントファイルのパス（.ttf）")

@@ -236,8 +236,8 @@ HTML_TEMPLATE = """
                     <div class="form-group">
                         <label for="from_honorific">敬称</label>
                         <input type="text" id="from_honorific" name="from_honorific"
-                               placeholder="例: 様、殿、御中、行（未入力でデフォルト「様」）" value="様">
-                        <p class="example">※ 未入力の場合は「様」が使用されます</p>
+                               placeholder="例: 様、殿、御中、行（未入力で敬称なし）" value="">
+                        <p class="example">※ 未入力の場合は敬称なしになります</p>
                     </div>
                     <div class="form-group">
                         <label for="from_phone">電話番号 *</label>
@@ -293,7 +293,7 @@ def generate_pdf():
         from_postal = request.form.get("from_postal", "").strip()
         from_address = request.form.get("from_address", "").strip()
         from_name = request.form.get("from_name", "").strip()
-        from_honorific = request.form.get("from_honorific", "様").strip()
+        from_honorific = request.form.get("from_honorific", "").strip()
         from_phone = request.form.get("from_phone", "").strip()
 
         # レイアウトモード取得

@@ -183,6 +183,22 @@ uv run ruff format src tests
 uv run ruff check --fix src tests
 ```
 
+### 静的WebUIのテスト
+
+静的HTML版（Pyodide）は、GitHub Actionsで自動的にテストされます：
+
+```yaml
+# .github/workflows/test-static-webui.yml
+# index_static.html, poc_pyodide.html, STATIC_VERSION.md の変更時に自動実行
+```
+
+**テスト内容**:
+- ✅ ページが正常にロード
+- ✅ Pyodideが正常に初期化（最大90秒）
+- ✅ Noto Sans JPフォントのダウンロード確認
+- ✅ フォーム要素の表示確認
+- ✅ PoC版のロード確認
+
 詳細なガイドラインは [AGENTS.md](AGENTS.md) および [CLAUDE.md](CLAUDE.md) を参照してください。
 
 ## 注意事項

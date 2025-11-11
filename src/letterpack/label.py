@@ -72,7 +72,7 @@ class SpacingConfig(BaseModel):
         default=27, ge=0, le=100, description="住所と名前セクションの間隔 (px)"
     )
     name_phone_gap: int = Field(
-        default=18, ge=0, le=100, description="名前と電話番号セクションの間隔 (px)"
+        default=36, ge=0, le=100, description="名前と電話番号セクションの間隔 (px)"
     )
     postal_box_offset_x: int = Field(
         default=15, ge=-100, le=100, description="郵便番号ボックスのX軸オフセット (px)"

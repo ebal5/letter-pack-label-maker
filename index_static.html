@@ -250,6 +250,12 @@
             </form>
 
             <div id="csv-form-container" style="display:none; margin-top: 50px; padding-top: 40px; border-top: 2px solid #e0e0e0;">
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <button type="button" id="download-sample-csv-btn" style="background: #4CAF50; padding: 12px 25px; font-size: 14px;">
+                        📥 サンプルCSVをダウンロード
+                    </button>
+                </div>
+
                 <div class="section">
                     <h2>📊 CSVファイルからの一括生成</h2>
                     <div class="form-group">
@@ -950,9 +956,74 @@ pdf_bytes
             }
         }
 
+        function downloadSampleCSV() {
+            // サンプルCSVデータ
+            const headers = [
+                'to_postal',
+                'to_address',
+                'to_name',
+                'to_phone',
+                'to_honorific',
+                'from_postal',
+                'from_address',
+                'from_name',
+                'from_phone',
+                'from_honorific'
+            ];
+
+            const sampleRows = [
+                [
+                    '123-4567',
+                    '東京都渋谷区XXX 1-2-3 XXXビル4F',
+                    '山田 太郎',
+                    '03-1234-5678',
+                    '',
+                    '987-6543',
+                    '大阪府大阪市YYY 4-5-6',
+                    '田中 花子',
+                    '06-9876-5432',
+                    ''
+                ],
+                [
+                    '111-2222',
+                    '京都府京都市ZZZ 7-8-9',
+                    '佐藤 次郎',
+                    '075-111-2222',
+                    '様',
+                    '555-6666',
+                    '福岡県福岡市AAA 10-11-12',
+                    '鈴木 美咲',
+                    '092-555-6666',
+                    '一郎'
+                ]
+            ];
+
+            // CSVを生成
+            let csv = headers.join(',') + '\n';
+            sampleRows.forEach(row => {
+                csv += row.map(cell => {
+                    // カンマやダブルクォートを含む場合はクォートで囲む
+                    if (cell.includes(',') || cell.includes('"')) {
+                        return '"' + cell.replace(/"/g, '""') + '"';
+                    }
+                    return cell;
+                }).join(',') + '\n';
+            });
+
+            // Blobを作成してダウンロード
+            const blob = new Blob([csv], { type: 'text/csv; charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sample.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         // イベントリスナー設定
         document.getElementById('label-form').addEventListener('submit', generatePDF);
         document.getElementById('generate-csv-btn').addEventListener('click', generateFromCSV);
+        document.getElementById('download-sample-csv-btn').addEventListener('click', downloadSampleCSV);
 
         // ページロード時に初期化
         window.addEventListener('load', initPyodide);

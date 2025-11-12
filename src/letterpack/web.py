@@ -2,6 +2,8 @@
 Webインターフェース (Flask)
 """
 
+import csv
+import io
 import os
 import sys
 import tempfile
@@ -439,6 +441,12 @@ HTML_TEMPLATE = r"""
             <div style="margin-top: 40px; padding-top: 40px; border-top: 2px solid #e0e0e0;">
                 <h2 style="text-align: center; color: #667eea; margin-bottom: 30px;">📊 CSVファイルからの一括生成</h2>
 
+                <div style="text-align: center; margin-bottom: 30px;">
+                    <a href="{{ url_for('download_sample_csv') }}" style="display: inline-block; background: #4CAF50; color: white; padding: 12px 25px; border-radius: 6px; text-decoration: none; font-weight: 600; transition: all 0.2s;" onmouseover="this.style.background='#45a049'" onmouseout="this.style.background='#4CAF50'">
+                        📥 サンプルCSVをダウンロード
+                    </a>
+                </div>
+
                 <form method="POST" action="{{ url_for('generate_csv') }}" enctype="multipart/form-data">
                     <div class="section">
                         <h2>CSVファイルをアップロード</h2>
@@ -477,6 +485,68 @@ HTML_TEMPLATE = r"""
 def index():
     """トップページ"""
     return render_template_string(HTML_TEMPLATE)
+
+
+@app.route("/sample_csv")
+def download_sample_csv():
+    """サンプルCSVをダウンロード"""
+    # CSVデータを作成
+    fieldnames = [
+        "to_postal",
+        "to_address",
+        "to_name",
+        "to_phone",
+        "to_honorific",
+        "from_postal",
+        "from_address",
+        "from_name",
+        "from_phone",
+        "from_honorific",
+    ]
+
+    sample_rows = [
+        {
+            "to_postal": "123-4567",
+            "to_address": "東京都渋谷区XXX 1-2-3 XXXビル4F",
+            "to_name": "山田 太郎",
+            "to_phone": "03-1234-5678",
+            "to_honorific": "",
+            "from_postal": "987-6543",
+            "from_address": "大阪府大阪市YYY 4-5-6",
+            "from_name": "田中 花子",
+            "from_phone": "06-9876-5432",
+            "from_honorific": "",
+        },
+        {
+            "to_postal": "111-2222",
+            "to_address": "京都府京都市ZZZ 7-8-9",
+            "to_name": "佐藤 次郎",
+            "to_phone": "075-111-2222",
+            "to_honorific": "様",
+            "from_postal": "555-6666",
+            "from_address": "福岡県福岡市AAA 10-11-12",
+            "from_name": "鈴木 美咲",
+            "from_phone": "092-555-6666",
+            "from_honorific": "一郎",
+        },
+    ]
+
+    # メモリ内にCSVを生成
+    csv_buffer = io.StringIO()
+    writer = csv.DictWriter(csv_buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(sample_rows)
+
+    # メモリ内のバイナリストリームを作成
+    csv_data = csv_buffer.getvalue().encode("utf-8")
+    csv_bytes = io.BytesIO(csv_data)
+
+    return send_file(
+        csv_bytes,
+        as_attachment=True,
+        download_name="sample.csv",
+        mimetype="text/csv; charset=utf-8",
+    )
 
 
 @app.route("/generate", methods=["POST"])

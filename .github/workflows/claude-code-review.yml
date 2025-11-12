@@ -41,25 +41,38 @@ jobs:
         id: claude-review
         timeout-minutes: 10
         uses: anthropics/claude-code-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ env.PR_NUMBER }}
+            Repository: ${{ github.repository }}
+            PR Number: ${{ env.PR_NUMBER }}
+            Event: ${{ github.event_name }}
 
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+            This workflow was triggered by a comment containing '@claude review'. Your task is to:
 
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            1. Review the pull request using the tools available to you
+            2. Examine the code changes, testing, and overall quality
+            3. Use the repository's CLAUDE.md for guidance on style and conventions
+            4. Provide constructive feedback on:
+               - Code quality and best practices
+               - Potential bugs or issues
+               - Performance considerations
+               - Security concerns
+               - Test coverage
 
-            IMPORTANT: You MUST use `gh pr comment` with your Bash tool to leave your review as a comment on the PR. Do not just output to the log.
+            CRITICAL: You MUST post your review as a comment on the PR using the gh CLI.
 
-            Command format:
-            gh pr comment ${{ env.PR_NUMBER }} --body "your review text here"
+            After reviewing, you MUST run this exact command to post your review:
+            gh pr comment ${{ env.PR_NUMBER }} --body "## Claude's Code Review
+
+            [Your detailed review here]
+
+            ---
+            *This review was automated by Claude Code.*"
+
+            Replace [Your detailed review here] with your actual review content. Do not output the review only to the log - it must be posted as a PR comment.
 
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options

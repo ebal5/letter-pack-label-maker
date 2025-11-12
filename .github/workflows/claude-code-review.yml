@@ -1,17 +1,22 @@
 name: Claude Code Review
 
 on:
-  issue_comment:
-    types: [created]
-  pull_request_review_comment:
-    types: [created]
+  pull_request:
+    types: [opened, synchronize]
+    # Optional: Only run on specific file changes
+    # paths:
+    #   - "src/**/*.ts"
+    #   - "src/**/*.tsx"
+    #   - "src/**/*.js"
+    #   - "src/**/*.jsx"
 
 jobs:
   claude-review:
-    # Only run when explicitly requested with '@claude review' in a comment
-    if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude review')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude review'))
+    # Optional: Filter by PR author
+    # if: |
+    #   github.event.pull_request.user.login == 'external-contributor' ||
+    #   github.event.pull_request.user.login == 'new-developer' ||
+    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
     runs-on: ubuntu-latest
     permissions:
@@ -26,17 +31,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Get PR number
-        id: pr-number
-        run: |
-          if [ "${{ github.event_name }}" = "issue_comment" ]; then
-            PR_NUMBER=${{ github.event.issue.number }}
-          else
-            PR_NUMBER=${{ github.event.pull_request.number }}
-          fi
-          echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_ENV
-
       - name: Run Claude Code Review
         id: claude-review
         timeout-minutes: 10
@@ -46,35 +40,22 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            Repository: ${{ github.repository }}
-            PR Number: ${{ env.PR_NUMBER }}
-            Event: ${{ github.event_name }}
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
 
-            This workflow was triggered by a comment containing '@claude review'. Your task is to:
+            Please review this pull request and provide feedback on:
+            - Code quality and best practices
+            - Potential bugs or issues
+            - Performance considerations
+            - Security concerns
+            - Test coverage
 
-            1. Review the pull request using the tools available to you
-            2. Examine the code changes, testing, and overall quality
-            3. Use the repository's CLAUDE.md for guidance on style and conventions
-            4. Provide constructive feedback on:
-               - Code quality and best practices
-               - Potential bugs or issues
-               - Performance considerations
-               - Security concerns
-               - Test coverage
+            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
 
-            CRITICAL: You MUST post your review as a comment on the PR using the gh CLI.
-
-            After reviewing, you MUST run this exact command to post your review:
-            gh pr comment ${{ env.PR_NUMBER }} --body "## Claude's Code Review
-
-            [Your detailed review here]
-
-            ---
-            *This review was automated by Claude Code.*"
-
-            Replace [Your detailed review here] with your actual review content. Do not output the review only to the log - it must be posted as a PR comment.
+            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
 
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options
           claude_args: '--model claude-haiku-4-5-20251001 --allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
+
 

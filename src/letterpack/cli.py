@@ -3,6 +3,7 @@
 """
 
 import argparse
+import csv
 import sys
 
 from .csv_parser import parse_csv
@@ -115,9 +116,65 @@ def main():
     # CSV一括生成
     parser.add_argument("--csv", help="CSVファイルからの一括生成（4upレイアウトで複数ページPDF）")
 
+    # サンプルCSV出力
+    parser.add_argument(
+        "--sample",
+        action="store_true",
+        help="ヘッダーとサンプル行を含むCSVを標準出力に出力",
+    )
+
     args = parser.parse_args()
 
     try:
+        # サンプルCSV出力モード
+        if args.sample:
+            # ヘッダーとサンプル行を定義
+            fieldnames = [
+                "to_postal",
+                "to_address",
+                "to_name",
+                "to_phone",
+                "to_honorific",
+                "from_postal",
+                "from_address",
+                "from_name",
+                "from_phone",
+                "from_honorific",
+            ]
+
+            sample_rows = [
+                {
+                    "to_postal": "123-4567",
+                    "to_address": "東京都渋谷区XXX 1-2-3 XXXビル4F",
+                    "to_name": "山田 太郎",
+                    "to_phone": "03-1234-5678",
+                    "to_honorific": "",
+                    "from_postal": "987-6543",
+                    "from_address": "大阪府大阪市YYY 4-5-6",
+                    "from_name": "田中 花子",
+                    "from_phone": "06-9876-5432",
+                    "from_honorific": "",
+                },
+                {
+                    "to_postal": "111-2222",
+                    "to_address": "京都府京都市ZZZ 7-8-9",
+                    "to_name": "佐藤 次郎",
+                    "to_phone": "075-111-2222",
+                    "to_honorific": "様",
+                    "from_postal": "555-6666",
+                    "from_address": "福岡県福岡市AAA 10-11-12",
+                    "from_name": "鈴木 美咲",
+                    "from_phone": "092-555-6666",
+                    "from_honorific": "一郎",
+                },
+            ]
+
+            # 標準出力にCSVを出力
+            writer = csv.DictWriter(sys.stdout, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(sample_rows)
+            return 0
+
         # CSVモード
         if args.csv:
             print("=" * 60)

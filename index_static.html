@@ -578,9 +578,15 @@ def create_label_bytes(to_info, from_info, layout_mode="center", font_path=None)
                     layout_mode: formData.get('layout_mode')
                 };
 
-                // Pythonでpdf生成
-                pyodide.globals.set('form_data', data);
+                // Pythonでpdf生成（JSON文字列として渡す）
+                const dataJson = JSON.stringify(data);
+                pyodide.globals.set('form_data_json', dataJson);
                 const pdfBytes = await pyodide.runPythonAsync(`
+import json
+
+# JSON文字列をPythonの辞書に変換
+form_data = json.loads(form_data_json)
+
 to_info = AddressInfo(
     postal_code=form_data['to_postal'],
     address=form_data['to_address'],

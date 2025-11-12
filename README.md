@@ -1,8 +1,15 @@
 # Letter Pack Label Maker
 
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live-brightgreen)](https://ebal5.github.io/letter-pack-label-maker/)
+![Deploy Pages](https://github.com/ebal5/letter-pack-label-maker/actions/workflows/deploy-pages.yml/badge.svg)
+
 レターパック用のラベルPDFを簡単に作成するツール
 
 ## 概要
+
+🚀 **[オンラインで試す](https://ebal5.github.io/letter-pack-label-maker/)** (サーバー不要・インストール不要)
+
+
 
 テキスト、CSV、またはWebフォーム入力から、レターパック用のラベルPDF（A4サイズ）を生成します。
 生成されるラベルは汎用的なTo/Fromフォーマットで、実際のレターパックの印刷範囲内に収まるように設計されています。
@@ -139,8 +146,10 @@ python -m http.server 8000
 
 ##### 公開URL
 
+[![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-Live-brightgreen)](https://ebal5.github.io/letter-pack-label-maker/)
+
 ```
-https://yourusername.github.io/letter-pack-label-maker/
+https://ebal5.github.io/letter-pack-label-maker/
 ```
 
 **アクセス可能なページ:**

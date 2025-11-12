@@ -121,14 +121,37 @@ python -m http.server 8000
 - ✅ **Noto Sans JP使用**: Google Fontsから高品質な日本語フォントを自動ダウンロード
 - ⚠️ **初回ロードが遅い**: Pyodide + フォントのダウンロード（約12MB）に時間がかかる
 
-#### GitHub Pagesで公開する
+#### GitHub Pagesで公開する（自動デプロイ）⭐ 推奨
 
-```bash
-# リポジトリのSettingsから GitHub Pages を有効化
-# Source: Deploy from a branch
-# Branch: main (または別のブランチ)
-# 公開URL: https://yourusername.github.io/letter-pack-label-maker/index_static.html
+このリポジトリには **GitHub Actions による自動デプロイ**が設定されています。
+
+##### 初回セットアップ
+
+1. リポジトリのSettings → Pages を開く
+2. **Source** を「**GitHub Actions**」に変更
+3. mainブランチにpushすると自動的にデプロイされます
+
+##### 自動デプロイの仕組み
+
+- mainブランチへのpush時に自動実行（`.github/workflows/deploy-pages.yml`）
+- `index_static.html` が公開URLのルート (`/`) にデプロイされます
+- 変更対象: `index_static.html`, `poc_pyodide.html`, `STATIC_VERSION.md`, `README.md`
+
+##### 公開URL
+
 ```
+https://yourusername.github.io/letter-pack-label-maker/
+```
+
+**アクセス可能なページ:**
+- `/` - メインのラベル作成UI（`index_static.html`）
+- `/poc_pyodide.html` - PyodideのPoC版
+- `/STATIC_VERSION.md` - 静的版のドキュメント
+- `/README.md` - プロジェクトREADME
+
+##### 手動デプロイ
+
+GitHub Actionsページから手動でワークフローを実行することも可能です。
 
 ### Docker環境での実行
 

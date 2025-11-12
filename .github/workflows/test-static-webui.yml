@@ -98,8 +98,8 @@ jobs:
               // ローディングステータスが非表示になることを確認
               await expect(loadingStatus).toBeHidden();
 
-              // Noto Sans JPフォントのダウンロード完了ログを確認
-              const fontLog = logs.find(log => log.includes('Noto Sans JPフォントのダウンロード完了'));
+              // Noto Sans JP Bold フォントのダウンロード完了ログを確認
+              const fontLog = logs.find(log => log.includes('Noto Sans JP Bold フォントのダウンロード完了'));
               expect(fontLog).toBeTruthy();
 
               console.log('✅ Pyodide初期化成功');

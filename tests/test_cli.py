@@ -14,7 +14,6 @@ def test_cli_sample_option():
         ["python", "-m", "letterpack.cli", "--sample"],
         capture_output=True,
         text=True,
-        cwd="/home/user/letter-pack-label-maker",
     )
 
     # 終了コードが0であることを確認

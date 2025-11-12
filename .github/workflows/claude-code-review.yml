@@ -40,19 +40,19 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+            リポジトリ: ${{ github.repository }}
+            プルリクエスト番号: ${{ github.event.pull_request.number }}
 
-            Please review this pull request and provide feedback on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Performance considerations
-            - Security concerns
-            - Test coverage
+            このプルリクエストをレビューし、以下の観点からフィードバックを提供してください：
+            - コード品質とベストプラクティス
+            - 潜在的なバグや問題
+            - パフォーマンス考慮事項
+            - セキュリティ上の懸念
+            - テストカバレッジ
 
-            Use the repository's CLAUDE.md for guidance on style and conventions. Be constructive and helpful in your feedback.
+            リポジトリのCLAUDE.mdを参考に、スタイルと規約についてのガイダンスを使用してください。建設的で有用なフィードバックを提供してください。
 
-            Use `gh pr comment` with your Bash tool to leave your review as a comment on the PR.
+            `gh pr comment`コマンドをBashツールで使用して、PRにコメントとしてレビューを残してください。
 
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://docs.claude.com/en/docs/claude-code/cli-reference for available options

@@ -375,8 +375,10 @@ class LabelGenerator:
                 # 輪郭線を追加して太く見せる
                 c.setFillColorRGB(0, 0, 0)
                 c.setStrokeColorRGB(0, 0, 0)
-                c.setLineWidth(0.4)
-                c.drawString(text_x, text_y, digits[i])
+                c.setLineWidth(0.6)  # 0.4から0.6に増加
+                # 複数回描画で太く
+                for dx in [-0.1, 0, 0.1]:
+                    c.drawString(text_x + dx, text_y, digits[i])
 
         separator_x = x + 3 * (box_size + box_spacing)
         separator_y = y + box_size / 2
@@ -396,8 +398,10 @@ class LabelGenerator:
                 # 輪郭線を追加して太く見せる
                 c.setFillColorRGB(0, 0, 0)
                 c.setStrokeColorRGB(0, 0, 0)
-                c.setLineWidth(0.4)
-                c.drawString(text_x, text_y, digits[digit_index])
+                c.setLineWidth(0.6)  # 0.4から0.6に増加
+                # 複数回描画で太く
+                for dx in [-0.1, 0, 0.1]:
+                    c.drawString(text_x + dx, text_y, digits[digit_index])
 
         c.setLineWidth(1)
 
@@ -429,12 +433,18 @@ class LabelGenerator:
         address_lines = self._split_address(address.address, 35)
         for line in address_lines[:3]:
             self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
-            c.setFont(self.font_name, 11)
+            address_font_size = 12  # 11から12に拡大
+            c.setFont(self.font_name, address_font_size)
             # 輪郭線を追加して太く見せる
             c.setFillColorRGB(0, 0, 0)
             c.setStrokeColorRGB(0, 0, 0)
-            c.setLineWidth(0.4)
-            c.drawString(x + margin + 4, current_y + 4, line)
+            c.setLineWidth(0.6)  # 0.4から0.6に増加
+
+            addr_x = x + margin + 4
+            addr_y = current_y + 4
+            # 複数回描画で太く
+            for dx in [-0.1, 0, 0.1]:
+                c.drawString(addr_x + dx, addr_y, line)
             current_y -= 18
 
         for _ in range(3 - len(address_lines)):
@@ -452,20 +462,37 @@ class LabelGenerator:
 
         self._draw_dotted_line(c, x + margin, current_y, name_line_end)
 
-        c.setFont(self.font_name, 14)
+        # 氏名を太く描画（フォントサイズを大きく、複数回描画で強調）
+        name_font_size = 16  # 14から16に拡大
+        c.setFont(self.font_name, name_font_size)
         c.setFillColorRGB(0, 0, 0)
-        # 輪郭線を追加して太く見せる
         c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(0.5)
-        c.drawString(x + margin + 4, current_y + 4, address.name)
+        c.setLineWidth(1.0)  # 0.5から1.0に拡大
+
+        name_x = x + margin + 4
+        name_y = current_y + 3  # フォントサイズが大きくなったので少し調整
+
+        # 複数回描画して太く見せる（疑似Bold効果）
+        offsets = [
+            (0, 0),
+            (0.15, 0),
+            (-0.15, 0),
+            (0, 0.15),
+            (0, -0.15),
+        ]
+        for dx, dy in offsets:
+            c.drawString(name_x + dx, name_y + dy, address.name)
 
         if honorific:
-            c.setFont(self.font_name, 14)
-            # 輪郭線を追加して太く見せる
+            c.setFont(self.font_name, name_font_size)
             c.setStrokeColorRGB(0, 0, 0)
-            c.setLineWidth(0.5)
+            c.setLineWidth(1.0)
             sama_x = name_line_end + 2 * mm
-            c.drawString(sama_x, current_y + 4, honorific)
+            sama_y = name_y
+
+            # 敬称も複数回描画
+            for dx, dy in offsets:
+                c.drawString(sama_x + dx, sama_y + dy, honorific)
 
         current_y -= 36
 
@@ -478,13 +505,19 @@ class LabelGenerator:
 
         current_y -= 15
 
-        c.setFont(self.font_name, 13)
+        phone_font_size = 14  # 13から14に拡大
+        c.setFont(self.font_name, phone_font_size)
         phone_text = f"( {address.phone} )"
         # 輪郭線を追加して太く見せる
         c.setFillColorRGB(0, 0, 0)
         c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(0.4)
-        c.drawString(x + margin + 30, current_y, phone_text)
+        c.setLineWidth(0.6)  # 0.4から0.6に増加
+
+        phone_x = x + margin + 30
+        phone_y = current_y
+        # 複数回描画で太く
+        for dx in [-0.1, 0, 0.1]:
+            c.drawString(phone_x + dx, phone_y, phone_text)
 
     def _split_address(self, address, max_length=30):
         if len(address) <= max_length:

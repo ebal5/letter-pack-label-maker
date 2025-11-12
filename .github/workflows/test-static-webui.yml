@@ -1,0 +1,162 @@
+name: Test Static WebUI (Pyodide)
+
+on:
+  push:
+    paths:
+      - 'index_static.html'
+      - 'poc_pyodide.html'
+      - 'STATIC_VERSION.md'
+  pull_request:
+    paths:
+      - 'index_static.html'
+      - 'poc_pyodide.html'
+      - 'STATIC_VERSION.md'
+
+jobs:
+  test-static-webui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install -D @playwright/test
+          npx playwright install chromium
+
+      - name: Create Playwright config
+        run: |
+          cat > playwright.config.js << 'EOF'
+          import { defineConfig } from '@playwright/test';
+
+          export default defineConfig({
+            testDir: './tests',
+            timeout: 120000, // 2分（Pyodide初期化に時間がかかるため）
+            use: {
+              headless: true,
+              viewport: { width: 1280, height: 720 },
+              ignoreHTTPSErrors: true,
+            },
+            reporter: [['list'], ['html']],
+          });
+          EOF
+
+      - name: Start HTTP server
+        run: |
+          python3 -m http.server 8888 &
+          sleep 2
+          echo "HTTP server started on port 8888"
+
+      - name: Create test file
+        run: |
+          mkdir -p tests
+          cat > tests/static-webui.test.js << 'EOF'
+          import { test, expect } from '@playwright/test';
+
+          const BASE_URL = 'http://localhost:8888';
+
+          test.describe('Static WebUI (Pyodide)', () => {
+            test('ページが正常にロードされる', async ({ page }) => {
+              await page.goto(`${BASE_URL}/index_static.html`);
+
+              // ページタイトルを確認
+              await expect(page).toHaveTitle(/レターパックラベル作成/);
+
+              // ヘッダーが表示されることを確認
+              const header = page.locator('h1');
+              await expect(header).toContainText('レターパックラベル作成');
+
+              console.log('✅ ページが正常にロードされました');
+            });
+
+            test('Pyodideが正常に初期化される', async ({ page }) => {
+              // コンソールログを監視
+              const logs = [];
+              page.on('console', msg => logs.push(msg.text()));
+
+              await page.goto(`${BASE_URL}/index_static.html`);
+
+              // ローディングステータスが表示されることを確認
+              const loadingStatus = page.locator('#loading-status');
+              await expect(loadingStatus).toBeVisible();
+
+              // Pyodideの初期化を待つ（最大90秒）
+              await page.waitForSelector('#label-form', { timeout: 90000 });
+
+              // フォームが表示されることを確認
+              const form = page.locator('#label-form');
+              await expect(form).toBeVisible();
+
+              // ローディングステータスが非表示になることを確認
+              await expect(loadingStatus).toBeHidden();
+
+              // Noto Sans JPフォントのダウンロード完了ログを確認
+              const fontLog = logs.find(log => log.includes('Noto Sans JPフォントのダウンロード完了'));
+              expect(fontLog).toBeTruthy();
+
+              console.log('✅ Pyodide初期化成功');
+              console.log(`   コンソールログ数: ${logs.length}`);
+            });
+
+            test('フォーム要素が正しく表示される', async ({ page }) => {
+              await page.goto(`${BASE_URL}/index_static.html`);
+
+              // フォームが表示されるまで待つ
+              await page.waitForSelector('#label-form', { timeout: 90000 });
+
+              // お届け先フィールドの存在を確認
+              await expect(page.locator('#to_postal')).toBeVisible();
+              await expect(page.locator('#to_address')).toBeVisible();
+              await expect(page.locator('#to_name')).toBeVisible();
+              await expect(page.locator('#to_phone')).toBeVisible();
+
+              // ご依頼主フィールドの存在を確認
+              await expect(page.locator('#from_postal')).toBeVisible();
+              await expect(page.locator('#from_address')).toBeVisible();
+              await expect(page.locator('#from_name')).toBeVisible();
+              await expect(page.locator('#from_phone')).toBeVisible();
+
+              // レイアウトモード選択が存在することを確認
+              await expect(page.locator('#layout_mode')).toBeVisible();
+
+              // 生成ボタンが存在することを確認
+              const generateBtn = page.locator('#generate-btn');
+              await expect(generateBtn).toBeVisible();
+              await expect(generateBtn).toHaveText(/PDFを生成/);
+
+              console.log('✅ フォーム要素が正しく表示されています');
+            });
+
+            test('PoC版が正常にロードされる', async ({ page }) => {
+              await page.goto(`${BASE_URL}/poc_pyodide.html`);
+
+              // ページタイトルを確認
+              await expect(page).toHaveTitle(/Pyodide \+ ReportLab/);
+
+              // ステータス要素が存在することを確認
+              const statusDiv = page.locator('#status');
+              await expect(statusDiv).toBeVisible();
+
+              console.log('✅ PoC版が正常にロードされました');
+            });
+          });
+          EOF
+
+      - name: Run Playwright tests
+        run: npx playwright test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

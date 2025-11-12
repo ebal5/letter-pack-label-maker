@@ -12,6 +12,7 @@
 - ✅ コマンドラインからPDF生成
 - ✅ Webブラウザからの入力・生成
 - ✅ CSVファイルからの一括生成（4upレイアウト、複数ページ対応）
+- ✅ 静的HTMLページ（サーバー不要、Pyodide使用）
 - 🔜 品名フィールドの追加（予定）
 
 ## インストール
@@ -97,7 +98,39 @@ uv run python -m letterpack.web
 
 開発環境では環境変数が未設定でも動作しますが、警告が表示されます。
 
-### Docker環境での実行（推奨）
+### 静的HTMLページ（サーバー不要版）⭐ 推奨
+
+**Pyodide**を使用した完全にフロントエンドだけで動作するバージョンです。サーバーのインストールや起動が不要で、HTMLファイルをブラウザで開くだけで使えます。
+
+#### 使い方
+
+```bash
+# 方法1: ローカルHTTPサーバーで開く（推奨）
+python -m http.server 8000
+# ブラウザで http://localhost:8000/index_static.html を開く
+
+# 方法2: 直接ファイルを開く
+# index_static.html をブラウザにドラッグ&ドロップ
+```
+
+#### 特徴
+
+- ✅ **サーバー不要**: HTMLファイルをブラウザで開くだけ
+- ✅ **完全オフライン対応**: 初回ロード後はオフラインでも動作（Pyodideのキャッシュ）
+- ✅ **GitHub Pagesで公開可能**: 静的ホスティングサービスで簡単に公開できる
+- ✅ **Noto Sans JP使用**: Google Fontsから高品質な日本語フォントを自動ダウンロード
+- ⚠️ **初回ロードが遅い**: Pyodide + フォントのダウンロード（約12MB）に時間がかかる
+
+#### GitHub Pagesで公開する
+
+```bash
+# リポジトリのSettingsから GitHub Pages を有効化
+# Source: Deploy from a branch
+# Branch: main (または別のブランチ)
+# 公開URL: https://yourusername.github.io/letter-pack-label-maker/index_static.html
+```
+
+### Docker環境での実行
 
 フォント環境を統一し、どの環境でも一貫したPDF出力を得るために、Docker環境の使用を推奨します。
 
@@ -149,6 +182,22 @@ uv run pytest
 uv run ruff format src tests
 uv run ruff check --fix src tests
 ```
+
+### 静的WebUIのテスト
+
+静的HTML版（Pyodide）は、GitHub Actionsで自動的にテストされます：
+
+```yaml
+# .github/workflows/test-static-webui.yml
+# index_static.html, poc_pyodide.html, STATIC_VERSION.md の変更時に自動実行
+```
+
+**テスト内容**:
+- ✅ ページが正常にロード
+- ✅ Pyodideが正常に初期化（最大90秒）
+- ✅ Noto Sans JPフォントのダウンロード確認
+- ✅ フォーム要素の表示確認
+- ✅ PoC版のロード確認
 
 詳細なガイドラインは [AGENTS.md](AGENTS.md) および [CLAUDE.md](CLAUDE.md) を参照してください。
 

@@ -248,6 +248,24 @@
                     <button type="submit" id="generate-btn">📄 PDFを生成</button>
                 </div>
             </form>
+
+            <div id="csv-form-container" style="display:none; margin-top: 50px; padding-top: 40px; border-top: 2px solid #e0e0e0;">
+                <div class="section">
+                    <h2>📊 CSVファイルからの一括生成</h2>
+                    <div class="form-group">
+                        <label for="csv_file">CSVファイル *</label>
+                        <input type="file" id="csv_file" name="csv_file" accept=".csv"
+                               style="padding: 10px; border: 2px dashed #667eea; border-radius: 6px; background: #f8f9fa;">
+                        <p class="example">
+                            ※ CSV形式（ヘッダー行必須）: to_postal, to_address, to_name, to_phone, to_honorific,
+                            from_postal, from_address, from_name, from_phone, from_honorific
+                        </p>
+                    </div>
+                </div>
+                <div class="btn-container">
+                    <button type="button" id="generate-csv-btn">📊 CSVから一括生成</button>
+                </div>
+            </div>
         </div>
 
         <footer>
@@ -543,6 +561,118 @@ class LabelGenerator:
 def create_label_bytes(to_info, from_info, layout_mode="center", font_path=None):
     generator = LabelGenerator(layout_mode=layout_mode, font_path=font_path)
     return generator.generate(to_info, from_info)
+
+def create_batch_labels_bytes(label_data_list, font_path=None):
+    """複数のラベルを一括生成（4件ごとに1ページ）"""
+    from io import BytesIO
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    label_width = 105 * mm
+    label_height = 148 * mm
+
+    positions = [
+        (0, height / 2),
+        (width / 2, height / 2),
+        (0, 0),
+        (width / 2, 0),
+    ]
+
+    generator = LabelGenerator(layout_mode="center", font_path=font_path)
+
+    for page_start in range(0, len(label_data_list), 4):
+        page_labels = label_data_list[page_start:page_start + 4]
+
+        for i, (to_info, from_info) in enumerate(page_labels):
+            x_offset, y_offset = positions[i]
+            generator._draw_single_label(c, to_info, from_info, x_offset, y_offset, label_width, label_height)
+
+        c.showPage()
+
+    c.save()
+    buffer.seek(0)
+    return buffer.getvalue()
+
+def parse_csv_string(csv_content):
+    """CSV文字列をパースして(to_info, from_info)のタプルのリストを返す"""
+    import io
+    import csv as csv_module
+
+    labels = []
+    errors = []
+
+    csv_file = io.StringIO(csv_content)
+    reader = csv_module.DictReader(csv_file)
+
+    required_columns = {
+        "to_postal", "to_address", "to_name", "to_phone",
+        "from_postal", "from_address", "from_name", "from_phone"
+    }
+    optional_columns = {"to_honorific", "from_honorific"}
+    all_columns = required_columns | optional_columns
+
+    if reader.fieldnames is None:
+        raise ValueError("CSVファイルにヘッダー行がありません")
+
+    missing_columns = required_columns - set(reader.fieldnames)
+    if missing_columns:
+        raise ValueError(f"必須カラムが不足しています: {', '.join(missing_columns)}")
+
+    for row_number, row in enumerate(reader, start=2):
+        try:
+            to_postal = row.get("to_postal", "").strip()
+            to_address = row.get("to_address", "").strip()
+            to_name = row.get("to_name", "").strip()
+            to_phone = row.get("to_phone", "").strip()
+            to_honorific = row.get("to_honorific", "").strip()
+            if not to_honorific:
+                to_honorific = "様"
+
+            from_postal = row.get("from_postal", "").strip()
+            from_address = row.get("from_address", "").strip()
+            from_name = row.get("from_name", "").strip()
+            from_phone = row.get("from_phone", "").strip()
+            from_honorific = row.get("from_honorific", "").strip()
+
+            try:
+                to_info = AddressInfo(
+                    postal_code=to_postal,
+                    address=to_address,
+                    name=to_name,
+                    phone=to_phone,
+                    honorific=to_honorific
+                )
+            except ValueError as e:
+                errors.append(f"行 {row_number}, お届け先: {str(e)}")
+                continue
+
+            try:
+                from_info = AddressInfo(
+                    postal_code=from_postal,
+                    address=from_address,
+                    name=from_name,
+                    phone=from_phone,
+                    honorific=from_honorific
+                )
+            except ValueError as e:
+                errors.append(f"行 {row_number}, ご依頼主: {str(e)}")
+                continue
+
+            labels.append((to_info, from_info))
+
+        except Exception as e:
+            errors.append(f"行 {row_number}, 全体: {str(e)}")
+
+    if errors:
+        error_summary = "\\n".join(errors)
+        raise ValueError(f"CSVファイルに {len(errors)} 件のエラーがあります:\\n{error_summary}")
+
+    if not labels:
+        raise ValueError("CSVファイルに有効なデータがありません")
+
+    return labels
 `;
 
         function showError(message) {
@@ -606,6 +736,7 @@ def create_label_bytes(to_info, from_info, layout_mode="center", font_path=None)
                 loadingStatus.classList.remove('show');
                 loadingStatus.style.display = 'none';
                 form.style.display = 'block';
+                document.getElementById('csv-form-container').style.display = 'block';
                 showSuccess('初期化完了！フォームに入力してPDFを生成できます');
 
             } catch (error) {
@@ -696,8 +827,132 @@ pdf_bytes
             }
         }
 
+        async function generateFromCSV(event) {
+            event.preventDefault();
+
+            if (!pythonInitialized) {
+                showError('Pythonが初期化されていません');
+                return;
+            }
+
+            const csvFileInput = document.getElementById('csv_file');
+            if (!csvFileInput.files || csvFileInput.files.length === 0) {
+                showError('CSVファイルを選択してください');
+                return;
+            }
+
+            const file = csvFileInput.files[0];
+            const generateBtn = document.getElementById('generate-csv-btn');
+            generateBtn.disabled = true;
+            generateBtn.innerHTML = '<span class="spinner" style="margin-right: 10px;"></span> CSV処理中...';
+
+            try {
+                // ファイルを読み込み
+                const csvContent = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.onerror = (e) => reject(e);
+                    reader.readAsText(file);
+                });
+
+                // Pyodideで CSV をパース
+                pyodide.globals.set('csv_content', csvContent);
+                const labelData = await pyodide.runPythonAsync(`
+import json
+
+try:
+    labels = parse_csv_string(csv_content)
+    # AddressInfoオブジェクトをJSON互換形式に変換
+    labels_json = []
+    for to_info, from_info in labels:
+        labels_json.append({
+            'to': {
+                'postal_code': to_info.postal_code,
+                'address': to_info.address,
+                'name': to_info.name,
+                'phone': to_info.phone,
+                'honorific': to_info.honorific
+            },
+            'from': {
+                'postal_code': from_info.postal_code,
+                'address': from_info.address,
+                'name': from_info.name,
+                'phone': from_info.phone,
+                'honorific': from_info.honorific
+            }
+        })
+
+    # JSON 形式で返す
+    json.dumps(labels_json)
+except Exception as e:
+    raise ValueError(str(e))
+                `);
+
+                // JSON をパース
+                const labelsArray = JSON.parse(labelData);
+
+                // 複数ラベルを生成
+                generateBtn.innerHTML = '<span class="spinner" style="margin-right: 10px;"></span> PDF生成中...';
+
+                pyodide.globals.set('labels_json', JSON.stringify(labelsArray));
+                const pdfBytes = await pyodide.runPythonAsync(`
+import json
+
+labels_json = pyodide.globals.get('labels_json')
+labels_array = json.loads(labels_json)
+
+# AddressInfo オブジェクトを再構築
+label_data_list = []
+for label in labels_array:
+    to_info = AddressInfo(
+        postal_code=label['to']['postal_code'],
+        address=label['to']['address'],
+        name=label['to']['name'],
+        phone=label['to']['phone'],
+        honorific=label['to']['honorific']
+    )
+    from_info = AddressInfo(
+        postal_code=label['from']['postal_code'],
+        address=label['from']['address'],
+        name=label['from']['name'],
+        phone=label['from']['phone'],
+        honorific=label['from']['honorific']
+    )
+    label_data_list.append((to_info, from_info))
+
+# Noto Sans JP Bold フォントが利用可能かチェック
+import os
+font_path = '/NotoSansJP-Bold.ttf' if os.path.exists('/NotoSansJP-Bold.ttf') else None
+
+# PDF生成
+pdf_bytes = create_batch_labels_bytes(label_data_list, font_path=font_path)
+pdf_bytes
+                `);
+
+                // PDFダウンロード
+                const blob = new Blob([pdfBytes.toJs()], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'letterpack_labels_batch.pdf';
+                a.click();
+                URL.revokeObjectURL(url);
+
+                showSuccess(`${labelsArray.length}件のラベルをCSVから生成しました！`);
+                csvFileInput.value = '';  // ファイル入力をリセット
+
+            } catch (error) {
+                console.error('CSV generation error:', error);
+                showError(`CSV処理エラー: ${error.message}`);
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '📊 CSVから一括生成';
+            }
+        }
+
         // イベントリスナー設定
         document.getElementById('label-form').addEventListener('submit', generatePDF);
+        document.getElementById('generate-csv-btn').addEventListener('click', generateFromCSV);
 
         // ページロード時に初期化
         window.addEventListener('load', initPyodide);

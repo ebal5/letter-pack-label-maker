@@ -61,6 +61,12 @@ class FontsConfig(BaseModel):
     postal_code: int = Field(default=13, gt=0, le=72, description="郵便番号のフォントサイズ (pt)")
     address: int = Field(default=11, gt=0, le=72, description="住所のフォントサイズ (pt)")
     name: int = Field(default=14, gt=0, le=72, description="氏名のフォントサイズ (pt)")
+    honorific: Optional[int] = Field(
+        default=None,
+        gt=0,
+        le=72,
+        description="敬称のフォントサイズ (pt)。Noneの場合は名前より2pt小さい",
+    )
     phone: int = Field(default=13, gt=0, le=72, description="電話番号のフォントサイズ (pt)")
 
 
@@ -562,7 +568,13 @@ class LabelGenerator:
 
         # 敬称を点線の右側に表示（敬称が指定されている場合のみ）
         if honorific:
-            c.setFont(self.font_name, name_font_size)
+            # 敬称のフォントサイズを取得（Noneの場合は名前より2pt小さい）
+            honorific_font_size = (
+                self.config.fonts.honorific
+                if self.config.fonts.honorific is not None
+                else max(name_font_size - 2, 1)
+            )
+            c.setFont(self.font_name, honorific_font_size)
             c.setFillColorRGB(0, 0, 0)
             sama_x = name_line_end + self.config.sama.offset * mm
             c.drawString(sama_x, current_y + dotted_line_text_offset, honorific)

@@ -406,3 +406,85 @@ def test_create_label_batch_5_labels():
     finally:
         if os.path.exists(output_path):
             os.remove(output_path)
+
+
+def test_default_honorific_font_size():
+    """敬称フォントサイズのデフォルト値テスト（名前より2pt小さい）"""
+    config = load_layout_config(None)
+    # デフォルトではhonorificはNone
+    assert config.fonts.honorific is None
+    # 敬称が設定されている場合のレンダリングを確認
+    to_addr = AddressInfo(
+        postal_code="123-4567",
+        address="東京都渋谷区XXX 1-2-3",
+        name="山田太郎",
+        phone="03-1234-5678",
+        honorific="様",
+    )
+    from_addr = AddressInfo(
+        postal_code="987-6543",
+        address="大阪府大阪市YYY 4-5-6",
+        name="田中花子",
+        phone="06-9876-5432",
+    )
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        output_path = tmp_file.name
+
+    try:
+        result = create_label(to_addr, from_addr, output_path)
+        assert os.path.exists(result)
+        assert os.path.getsize(result) > 0
+
+        # CI環境用にPDFを保存
+        save_to_test_output(result)
+    finally:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+
+def test_custom_honorific_font_size():
+    """敬称フォントサイズの指定テスト"""
+    # カスタム設定ファイルを作成（敬称を10ptに指定）
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_config:
+        config_data = {
+            "fonts": {"name": 14, "honorific": 10},
+        }
+        yaml.dump(config_data, tmp_config)
+        config_path = tmp_config.name
+
+    try:
+        config = load_layout_config(config_path)
+        assert config.fonts.name == 14
+        assert config.fonts.honorific == 10
+
+        to_addr = AddressInfo(
+            postal_code="123-4567",
+            address="東京都渋谷区XXX 1-2-3",
+            name="山田太郎",
+            phone="03-1234-5678",
+            honorific="様",
+        )
+        from_addr = AddressInfo(
+            postal_code="987-6543",
+            address="大阪府大阪市YYY 4-5-6",
+            name="田中花子",
+            phone="06-9876-5432",
+        )
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+            output_path = tmp_pdf.name
+
+        try:
+            result = create_label(to_addr, from_addr, output_path, config_path=config_path)
+            assert os.path.exists(result)
+            assert os.path.getsize(result) > 0
+
+            # CI環境用にPDFを保存
+            save_to_test_output(result)
+        finally:
+            if os.path.exists(output_path):
+                os.remove(output_path)
+    finally:
+        if os.path.exists(config_path):
+            os.remove(config_path)

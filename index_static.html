@@ -372,6 +372,10 @@ class LabelGenerator:
                 text_width = c.stringWidth(digits[i], self.font_name, postal_font_size)
                 text_x = box_x + (box_size - text_width) / 2
                 text_y = y + (box_size - postal_font_size) / 2 + 2
+                # 輪郭線を追加して太く見せる
+                c.setFillColorRGB(0, 0, 0)
+                c.setStrokeColorRGB(0, 0, 0)
+                c.setLineWidth(0.4)
                 c.drawString(text_x, text_y, digits[i])
 
         separator_x = x + 3 * (box_size + box_spacing)
@@ -389,6 +393,10 @@ class LabelGenerator:
                 text_width = c.stringWidth(digits[digit_index], self.font_name, postal_font_size)
                 text_x = box_x + (box_size - text_width) / 2
                 text_y = y + (box_size - postal_font_size) / 2 + 2
+                # 輪郭線を追加して太く見せる
+                c.setFillColorRGB(0, 0, 0)
+                c.setStrokeColorRGB(0, 0, 0)
+                c.setLineWidth(0.4)
                 c.drawString(text_x, text_y, digits[digit_index])
 
         c.setLineWidth(1)
@@ -407,6 +415,9 @@ class LabelGenerator:
         c.setFont(self.font_name, 9)
         c.setFillColorRGB(0, 0, 0)
         postal_y = current_y
+        # 輪郭線を追加して太く見せる
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(0.3)
         c.drawString(x + margin, postal_y, "〒")
 
         c.setFont(self.font_name, 13)
@@ -419,6 +430,10 @@ class LabelGenerator:
         for line in address_lines[:3]:
             self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
             c.setFont(self.font_name, 11)
+            # 輪郭線を追加して太く見せる
+            c.setFillColorRGB(0, 0, 0)
+            c.setStrokeColorRGB(0, 0, 0)
+            c.setLineWidth(0.4)
             c.drawString(x + margin + 4, current_y + 4, line)
             current_y -= 18
 
@@ -439,22 +454,36 @@ class LabelGenerator:
 
         c.setFont(self.font_name, 14)
         c.setFillColorRGB(0, 0, 0)
+        # 輪郭線を追加して太く見せる
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(0.5)
         c.drawString(x + margin + 4, current_y + 4, address.name)
 
         if honorific:
             c.setFont(self.font_name, 14)
+            # 輪郭線を追加して太く見せる
+            c.setStrokeColorRGB(0, 0, 0)
+            c.setLineWidth(0.5)
             sama_x = name_line_end + 2 * mm
             c.drawString(sama_x, current_y + 4, honorific)
 
         current_y -= 36
 
         c.setFont(self.font_name, 9)
+        # 輪郭線を追加して太く見せる
+        c.setFillColorRGB(0, 0, 0)
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(0.3)
         c.drawString(x + margin, current_y, "Tel.")
 
         current_y -= 15
 
         c.setFont(self.font_name, 13)
         phone_text = f"( {address.phone} )"
+        # 輪郭線を追加して太く見せる
+        c.setFillColorRGB(0, 0, 0)
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(0.4)
         c.drawString(x + margin + 30, current_y, phone_text)
 
     def _split_address(self, address, max_length=30):
@@ -518,19 +547,20 @@ def create_label_bytes(to_info, from_info, layout_mode="center", font_path=None)
 
                 loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> Noto Sans JPフォントをダウンロード中...';
 
-                // Noto Sans JPフォントをGoogle Fontsからダウンロード
+                // Noto Sans JP Bold フォントをGoogle Fontsからダウンロード
                 try {
-                    const fontUrl = 'https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEi75vY0rw-oME.ttf';
+                    // Noto Sans JP Bold (weight 700) を使用
+                    const fontUrl = 'https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFQZoIq8q7OMa3T57qnmPk_og.ttf';
                     const fontResponse = await fetch(fontUrl);
                     const fontArrayBuffer = await fontResponse.arrayBuffer();
                     const fontBytes = new Uint8Array(fontArrayBuffer);
 
                     // Pyodideの仮想ファイルシステムに保存
-                    pyodide.FS.writeFile('/NotoSansJP-Regular.ttf', fontBytes);
+                    pyodide.FS.writeFile('/NotoSansJP-Bold.ttf', fontBytes);
 
-                    console.log('Noto Sans JPフォントのダウンロード完了');
+                    console.log('Noto Sans JP Bold フォントのダウンロード完了');
                 } catch (fontError) {
-                    console.warn('Noto Sans JPのダウンロードに失敗、フォールバックを使用:', fontError);
+                    console.warn('Noto Sans JP Bold のダウンロードに失敗、フォールバックを使用:', fontError);
                 }
 
                 loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> Python コードをロード中...';
@@ -603,9 +633,9 @@ from_info = AddressInfo(
     honorific=form_data['from_honorific'] if form_data['from_honorific'] else None
 )
 
-# Noto Sans JPフォントが利用可能かチェック
+# Noto Sans JP Bold フォントが利用可能かチェック
 import os
-font_path = '/NotoSansJP-Regular.ttf' if os.path.exists('/NotoSansJP-Regular.ttf') else None
+font_path = '/NotoSansJP-Bold.ttf' if os.path.exists('/NotoSansJP-Bold.ttf') else None
 
 pdf_bytes = create_label_bytes(to_info, from_info, form_data['layout_mode'], font_path=font_path)
 pdf_bytes

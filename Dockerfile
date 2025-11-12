@@ -9,8 +9,7 @@ LABEL description="レターパックラベル作成Webサーバー"
 
 # 環境変数
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    UV_SYSTEM_PYTHON=1
+    PYTHONDONTWRITEBYTECODE=1
 
 # システムパッケージの更新と必要なパッケージのインストール
 # - fonts-noto-cjk: Noto CJKフォント（日本語、中国語、韓国語対応）
@@ -46,8 +45,12 @@ ENV PATH="/app/.local/bin:${PATH}"
 # 依存関係ファイルのコピー
 COPY --chown=letterpack:letterpack pyproject.toml README.md ./
 
-# 依存関係のインストール
-RUN uv pip install -e .
+# 仮想環境の作成と依存関係のインストール
+RUN uv venv /app/.venv && \
+    /app/.venv/bin/pip install -e .
+
+# 仮想環境のPythonを使用
+ENV PATH="/app/.venv/bin:${PATH}"
 
 # アプリケーションコードのコピー
 COPY --chown=letterpack:letterpack src/ ./src/

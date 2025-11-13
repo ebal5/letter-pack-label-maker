@@ -283,6 +283,200 @@
         let pyodide = null;
         let pythonInitialized = false;
 
+        // ============================================
+        // Pyodide Integration Agent
+        // Performance metrics and diagnostics
+        // ============================================
+
+        window.pyodideMetrics = {
+            pyodideLoad: 0,
+            micropipLoad: 0,
+            reportlabInstall: 0,
+            fontDownload: 0,
+            fontMount: 0,
+            pythonCodeLoad: 0,
+            total: 0,
+            startTime: null
+        };
+
+        /**
+         * Diagnostics and Performance Monitoring
+         */
+        class PyodideDiagnostics {
+            static async generateReport() {
+                const report = {
+                    pyodideVersion: pyodide?.version || 'unknown',
+                    pythonVersion: '3.11',
+                    initializedAt: new Date().toISOString(),
+                    metrics: { ...window.pyodideMetrics },
+                    environment: {
+                        userAgent: navigator.userAgent,
+                        onLine: navigator.onLine,
+                        memoryCaps: this._getMemoryCaps()
+                    },
+                    fontStatus: this._checkFontStatus(),
+                    errors: []
+                };
+                return report;
+            }
+
+            static _getMemoryCaps() {
+                if (performance && performance.memory) {
+                    return {
+                        jsHeapSizeLimit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024) + 'MB',
+                        totalJSHeapSize: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + 'MB',
+                        usedJSHeapSize: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB'
+                    };
+                }
+                return null;
+            }
+
+            static _checkFontStatus() {
+                if (!pyodide) return { status: 'not_initialized' };
+
+                try {
+                    const fontExists = pyodide.FS.analyzePath('/NotoSansJP-Bold.ttf').exists;
+                    return {
+                        status: fontExists ? 'loaded' : 'missing',
+                        path: '/NotoSansJP-Bold.ttf'
+                    };
+                } catch (e) {
+                    return { status: 'error', error: e.message };
+                }
+            }
+
+            static logMetrics() {
+                console.table(window.pyodideMetrics);
+            }
+
+            static async sendReport(endpoint) {
+                const report = await this.generateReport();
+                console.log('Pyodide Diagnostic Report:', report);
+                return report;
+            }
+        }
+
+        /**
+         * IndexedDB Font Caching
+         */
+        class FontCacheManager {
+            static DB_NAME = 'letterpack-fonts';
+            static DB_VERSION = 1;
+            static STORE_NAME = 'fonts';
+
+            static async init() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+
+                    request.onerror = () => reject(request.error);
+                    request.onsuccess = () => resolve(request.result);
+
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains(this.STORE_NAME)) {
+                            db.createObjectStore(this.STORE_NAME);
+                        }
+                    };
+                });
+            }
+
+            static async get(fontName) {
+                try {
+                    const db = await this.init();
+                    return new Promise((resolve, reject) => {
+                        const transaction = db.transaction(this.STORE_NAME, 'readonly');
+                        const store = transaction.objectStore(this.STORE_NAME);
+                        const request = store.get(fontName);
+
+                        request.onerror = () => reject(request.error);
+                        request.onsuccess = () => resolve(request.result);
+                    });
+                } catch (e) {
+                    console.warn('Font cache read error:', e);
+                    return null;
+                }
+            }
+
+            static async set(fontName, fontData) {
+                try {
+                    const db = await this.init();
+                    return new Promise((resolve, reject) => {
+                        const transaction = db.transaction(this.STORE_NAME, 'readwrite');
+                        const store = transaction.objectStore(this.STORE_NAME);
+                        const request = store.put(fontData, fontName);
+
+                        request.onerror = () => reject(request.error);
+                        request.onsuccess = () => resolve(true);
+                    });
+                } catch (e) {
+                    console.warn('Font cache write error:', e);
+                    return false;
+                }
+            }
+
+            static async clear() {
+                try {
+                    const db = await this.init();
+                    return new Promise((resolve, reject) => {
+                        const transaction = db.transaction(this.STORE_NAME, 'readwrite');
+                        const store = transaction.objectStore(this.STORE_NAME);
+                        const request = store.clear();
+
+                        request.onerror = () => reject(request.error);
+                        request.onsuccess = () => resolve(true);
+                    });
+                } catch (e) {
+                    console.warn('Font cache clear error:', e);
+                    return false;
+                }
+            }
+        }
+
+        /**
+         * Enhanced Error Handler
+         */
+        class ErrorHandler {
+            static networkErrors = [
+                'NetworkError',
+                'TypeError',
+                'Failed to fetch'
+            ];
+
+            static getFriendlyMessage(error) {
+                const msg = error.message || String(error);
+
+                if (this.networkErrors.some(e => msg.includes(e))) {
+                    return 'ネットワークエラー: インターネット接続を確認してください。';
+                }
+
+                if (msg.includes('reportlab')) {
+                    return 'ReportLabのインストールに失敗しました。ページを再読み込みしてください。';
+                }
+
+                if (msg.includes('font')) {
+                    return 'フォントの読み込みに失敗しました。フォールバックフォントを使用しています。';
+                }
+
+                if (msg.includes('memory') || msg.includes('heap')) {
+                    return 'メモリ不足です。ブラウザを再起動してから再度お試しください。';
+                }
+
+                return error.message || 'エラーが発生しました。';
+            }
+
+            static logError(context, error) {
+                console.error(`[${context}] Error:`, error);
+                const report = {
+                    context,
+                    message: error.message,
+                    stack: error.stack,
+                    timestamp: new Date().toISOString(),
+                    metrics: { ...window.pyodideMetrics }
+                };
+                console.log('Error Report:', JSON.stringify(report, null, 2));
+            }
+        }
+
         // Python label生成コード（Noto Sans JP使用版）
         const labelPythonCode = `
 from dataclasses import dataclass
@@ -699,54 +893,96 @@ def parse_csv_string(csv_content):
         async function initPyodide() {
             const loadingStatus = document.getElementById('loading-status');
             const form = document.getElementById('label-form');
+            const FONT_CACHE_KEY = 'noto-sans-jp-bold-v52';
+            const FONT_URL = 'https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFQZoIq8q7OMa3T57qnmPk_og.ttf';
+
+            window.pyodideMetrics.startTime = performance.now();
 
             try {
                 loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> Pyodideをロード中...';
 
+                let stepStart = performance.now();
                 pyodide = await loadPyodide({
                     indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/"
                 });
+                window.pyodideMetrics.pyodideLoad = performance.now() - stepStart;
 
                 loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> ReportLabをインストール中...';
 
+                stepStart = performance.now();
                 await pyodide.loadPackage('micropip');
+                window.pyodideMetrics.micropipLoad = performance.now() - stepStart;
+
+                stepStart = performance.now();
                 await pyodide.runPythonAsync(`
                     import micropip
                     await micropip.install('reportlab')
                 `);
+                window.pyodideMetrics.reportlabInstall = performance.now() - stepStart;
 
                 loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> Noto Sans JPフォントをダウンロード中...';
 
-                // Noto Sans JP Bold フォントをGoogle Fontsからダウンロード
+                // Noto Sans JP Bold フォントをキャッシュまたはダウンロード
                 try {
-                    // Noto Sans JP Bold (weight 700) を使用
-                    const fontUrl = 'https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFQZoIq8q7OMa3T57qnmPk_og.ttf';
-                    const fontResponse = await fetch(fontUrl);
-                    const fontArrayBuffer = await fontResponse.arrayBuffer();
-                    const fontBytes = new Uint8Array(fontArrayBuffer);
+                    stepStart = performance.now();
+
+                    // キャッシュをチェック
+                    let fontBytes = await FontCacheManager.get(FONT_CACHE_KEY);
+                    let fromCache = true;
+
+                    if (!fontBytes) {
+                        fromCache = false;
+                        const fontResponse = await fetch(FONT_URL);
+                        if (!fontResponse.ok) {
+                            throw new Error(`フォント取得失敗 (${fontResponse.status}): ${FONT_URL}`);
+                        }
+                        const fontArrayBuffer = await fontResponse.arrayBuffer();
+                        fontBytes = new Uint8Array(fontArrayBuffer);
+
+                        // キャッシュに保存（失敗しても続行）
+                        await FontCacheManager.set(FONT_CACHE_KEY, fontBytes).catch(e => {
+                            console.warn('フォントキャッシュ保存失敗:', e);
+                        });
+                    }
+
+                    window.pyodideMetrics.fontDownload = performance.now() - stepStart;
 
                     // Pyodideの仮想ファイルシステムに保存
+                    stepStart = performance.now();
                     pyodide.FS.writeFile('/NotoSansJP-Bold.ttf', fontBytes);
+                    window.pyodideMetrics.fontMount = performance.now() - stepStart;
 
-                    console.log('Noto Sans JP Bold フォントのダウンロード完了');
+                    console.log(`Noto Sans JP Bold フォント${fromCache ? 'キャッシュ' : 'ダウンロード'}完了 (${Math.round(fontBytes.length / 1024 / 1024 * 100) / 100}MB)`);
                 } catch (fontError) {
-                    console.warn('Noto Sans JP Bold のダウンロードに失敗、フォールバックを使用:', fontError);
+                    ErrorHandler.logError('FontLoading', fontError);
+                    console.warn('Noto Sans JP Bold のダウンロードに失敗、フォールバックを使用:', fontError.message);
+                    window.pyodideMetrics.fontDownload = performance.now() - stepStart;
                 }
 
                 loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> Python コードをロード中...';
 
+                stepStart = performance.now();
                 pyodide.runPython(labelPythonCode);
+                window.pyodideMetrics.pythonCodeLoad = performance.now() - stepStart;
+
+                window.pyodideMetrics.total = performance.now() - window.pyodideMetrics.startTime;
 
                 pythonInitialized = true;
                 loadingStatus.classList.remove('show');
                 loadingStatus.style.display = 'none';
                 form.style.display = 'block';
                 document.getElementById('csv-form-container').style.display = 'block';
+
+                // パフォーマンス統計を出力
+                PyodideDiagnostics.logMetrics();
+
                 showSuccess('初期化完了！フォームに入力してPDFを生成できます');
 
             } catch (error) {
+                ErrorHandler.logError('PyodideInitialization', error);
                 console.error('Initialization error:', error);
-                loadingStatus.innerHTML = `<div class="alert alert-error">初期化エラー: ${error.message}</div>`;
+                const friendlyMsg = ErrorHandler.getFriendlyMessage(error);
+                loadingStatus.innerHTML = `<div class="alert alert-error">初期化エラー: ${friendlyMsg}</div>`;
             }
         }
 
@@ -824,8 +1060,10 @@ pdf_bytes
                 showSuccess('PDFを生成しました！ダウンロードを確認してください');
 
             } catch (error) {
+                ErrorHandler.logError('PDFGeneration', error);
                 console.error('PDF generation error:', error);
-                showError(`PDF生成エラー: ${error.message}`);
+                const friendlyMsg = ErrorHandler.getFriendlyMessage(error);
+                showError(`PDF生成エラー: ${friendlyMsg}`);
             } finally {
                 generateBtn.disabled = false;
                 generateBtn.innerHTML = '📄 PDFを生成';
@@ -947,8 +1185,10 @@ pdf_bytes
                 csvFileInput.value = '';  // ファイル入力をリセット
 
             } catch (error) {
+                ErrorHandler.logError('CSVGeneration', error);
                 console.error('CSV generation error:', error);
-                showError(`CSV処理エラー: ${error.message}`);
+                const friendlyMsg = ErrorHandler.getFriendlyMessage(error);
+                showError(`CSV処理エラー: ${friendlyMsg}`);
             } finally {
                 generateBtn.disabled = false;
                 generateBtn.innerHTML = '📊 CSVから一括生成';

@@ -22,8 +22,10 @@ class AddressInfo:
     """住所情報を保持するデータクラス"""
 
     postal_code: str  # 郵便番号（例: "123-4567"）
-    address: str  # 住所
+    address1: str  # 住所1行目（必須）
     name: str  # 氏名
+    address2: Optional[str] = None  # 住所2行目（任意）
+    address3: Optional[str] = None  # 住所3行目（任意）
     phone: Optional[str] = None  # 電話番号
     honorific: Optional[str] = None  # 敬称（Noneまたは空文字列で敬称なし）
 
@@ -31,8 +33,8 @@ class AddressInfo:
         """バリデーション"""
         if not self.postal_code:
             raise ValueError("郵便番号は必須です")
-        if not self.address:
-            raise ValueError("住所は必須です")
+        if not self.address1:
+            raise ValueError("住所1行目は必須です")
         if not self.name:
             raise ValueError("氏名は必須です")
 
@@ -528,11 +530,15 @@ class LabelGenerator:
 
         current_y -= section_spacing
 
-        # 住所記入エリア（複数行の点線）
-        address_lines = self._split_address(
-            address.address, max_length=self.config.address.max_length
-        )
-        for line in address_lines[: self.config.address.max_lines]:
+        # 住所記入エリア（3行）
+        address_lines = [address.address1]
+        if address.address2:
+            address_lines.append(address.address2)
+        if address.address3:
+            address_lines.append(address.address3)
+
+        # 入力された住所を表示
+        for line in address_lines:
             self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
             c.setFont(self.font_name, address_font_size)
             c.drawString(
@@ -540,8 +546,9 @@ class LabelGenerator:
             )
             current_y -= address_line_height
 
-        # 追加の点線（空欄）
-        for _ in range(self.config.address.max_lines - len(address_lines)):
+        # 残りの空欄の点線
+        remaining_lines = self.config.address.max_lines - len(address_lines)
+        for _ in range(remaining_lines):
             self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
             current_y -= address_line_height
 

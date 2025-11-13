@@ -385,9 +385,9 @@ HTML_TEMPLATE = r"""
                         <p class="example">※ 未入力の場合は「様」が使用されます</p>
                     </div>
                     <div class="form-group">
-                        <label for="to_phone">電話番号 *</label>
+                        <label for="to_phone">電話番号</label>
                         <input type="text" id="to_phone" name="to_phone"
-                               placeholder="例: 03-1234-5678" required>
+                               placeholder="例: 03-1234-5678">
                     </div>
                 </div>
 
@@ -415,9 +415,9 @@ HTML_TEMPLATE = r"""
                         <p class="example">※ 未入力の場合は敬称なしになります</p>
                     </div>
                     <div class="form-group">
-                        <label for="from_phone">電話番号 *</label>
+                        <label for="from_phone">電話番号</label>
                         <input type="text" id="from_phone" name="from_phone"
-                               placeholder="例: 06-9876-5432" required>
+                               placeholder="例: 06-9876-5432">
                     </div>
                 </div>
 

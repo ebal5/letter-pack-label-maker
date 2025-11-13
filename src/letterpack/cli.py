@@ -208,9 +208,9 @@ def main():
             return 0
 
         # 通常モード（1件のみ）
-        # 引数チェック: 全て指定されているか、全て未指定か
-        to_args = [args.to_name, args.to_postal, args.to_address, args.to_phone]
-        from_args = [args.from_name, args.from_postal, args.from_address, args.from_phone]
+        # 引数チェック: 全て指定されているか、全て未指定か（電話番号は必須ではない）
+        to_args = [args.to_name, args.to_postal, args.to_address]
+        from_args = [args.from_name, args.from_postal, args.from_address]
         all_args = to_args + from_args
 
         all_specified = all(arg is not None for arg in all_args)

@@ -110,8 +110,9 @@ def test_parse_csv_missing_column():
 
 def test_parse_csv_missing_required_column():
     """必須カラムが欠けている場合のテスト（修正版）"""
-    csv_content = """to_postal,to_address,to_name,from_postal,from_address,from_name,from_phone
-123-4567,東京都渋谷区XXX 1-2-3,山田太郎,987-6543,大阪府大阪市YYY 4-5-6,田中花子,06-9876-5432
+    # to_postalカラムが欠けているCSV（必須カラムの欠落）
+    csv_content = """to_address,to_name,from_postal,from_address,from_name
+東京都渋谷区XXX 1-2-3,山田太郎,987-6543,大阪府大阪市YYY 4-5-6,田中花子
 """
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
@@ -229,6 +230,59 @@ def test_parse_csv_shift_jis_encoding():
         labels = parse_csv(csv_path)
         assert len(labels) == 1
         assert labels[0].to_address.name == "山田太郎"
+
+    finally:
+        if os.path.exists(csv_path):
+            os.remove(csv_path)
+
+
+def test_parse_csv_without_phone_columns():
+    """電話番号カラムがないCSVのテスト（新機能：電話番号を任意に変更）"""
+    csv_content = """to_postal,to_address,to_name,to_honorific,from_postal,from_address,from_name,from_honorific
+123-4567,東京都渋谷区XXX 1-2-3,山田太郎,様,987-6543,大阪府大阪市YYY 4-5-6,田中花子,
+"""
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
+        f.write(csv_content)
+        csv_path = f.name
+
+    try:
+        labels = parse_csv(csv_path)
+        assert len(labels) == 1
+        # 電話番号カラムがない場合、phoneはNoneになる
+        assert labels[0].to_address.phone is None
+        assert labels[0].from_address.phone is None
+        # その他のフィールドは正常に読み込まれる
+        assert labels[0].to_address.name == "山田太郎"
+        assert labels[0].from_address.name == "田中花子"
+
+    finally:
+        if os.path.exists(csv_path):
+            os.remove(csv_path)
+
+
+def test_parse_csv_with_empty_phone_fields():
+    """電話番号カラムが存在するが空のCSVのテスト（新機能：電話番号を任意に変更）"""
+    csv_content = """to_postal,to_address,to_name,to_phone,to_honorific,from_postal,from_address,from_name,from_phone,from_honorific
+123-4567,東京都渋谷区XXX 1-2-3,山田太郎,,様,987-6543,大阪府大阪市YYY 4-5-6,田中花子,,
+456-7890,神奈川県横浜市ZZZ 7-8-9,佐藤次郎,  ,殿,987-6543,大阪府大阪市YYY 4-5-6,田中花子,  ,
+"""
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
+        f.write(csv_content)
+        csv_path = f.name
+
+    try:
+        labels = parse_csv(csv_path)
+        assert len(labels) == 2
+
+        # 1件目：空文字列の電話番号はNoneに変換される
+        assert labels[0].to_address.phone is None
+        assert labels[0].from_address.phone is None
+
+        # 2件目：空白のみの電話番号もNoneに変換される
+        assert labels[1].to_address.phone is None
+        assert labels[1].from_address.phone is None
 
     finally:
         if os.path.exists(csv_path):

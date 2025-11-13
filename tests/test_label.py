@@ -43,6 +43,26 @@ def test_address_info_creation():
     assert addr.name == "山田太郎"
 
 
+def test_address_info_without_phone():
+    """電話番号なしでAddressInfoを作成するテスト（新機能：電話番号を任意に変更）"""
+    # 電話番号を指定しない場合
+    addr1 = AddressInfo(
+        postal_code="123-4567",
+        address="東京都渋谷区XXX 1-2-3",
+        name="山田太郎",
+    )
+    assert addr1.phone is None
+
+    # 電話番号にNoneを明示的に指定する場合
+    addr2 = AddressInfo(
+        postal_code="456-7890",
+        address="大阪府大阪市YYY 4-5-6",
+        name="田中花子",
+        phone=None,
+    )
+    assert addr2.phone is None
+
+
 def test_address_info_validation():
     """AddressInfoのバリデーションテスト"""
     with pytest.raises(ValueError):
@@ -65,6 +85,36 @@ def test_label_generation():
         address="大阪府大阪市YYY 4-5-6",
         name="田中花子",
         phone="06-9876-5432",
+    )
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
+        output_path = tmp_file.name
+
+    try:
+        result = create_label(to_addr, from_addr, output_path)
+        assert os.path.exists(result)
+        assert os.path.getsize(result) > 0
+
+        # CI環境用にPDFを保存
+        save_to_test_output(result)
+    finally:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+
+def test_label_generation_without_phone():
+    """電話番号なしでPDF生成テスト（新機能：電話番号を任意に変更）"""
+    to_addr = AddressInfo(
+        postal_code="123-4567",
+        address="東京都渋谷区XXX 1-2-3",
+        name="山田太郎",
+        phone=None,
+    )
+    from_addr = AddressInfo(
+        postal_code="987-6543",
+        address="大阪府大阪市YYY 4-5-6",
+        name="田中花子",
+        phone=None,
     )
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:

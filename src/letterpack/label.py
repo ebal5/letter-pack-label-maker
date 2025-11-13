@@ -24,7 +24,7 @@ class AddressInfo:
     postal_code: str  # 郵便番号（例: "123-4567"）
     address: str  # 住所
     name: str  # 氏名
-    phone: str  # 電話番号
+    phone: Optional[str] = None  # 電話番号
     honorific: Optional[str] = None  # 敬称（Noneまたは空文字列で敬称なし）
 
     def __post_init__(self):
@@ -35,8 +35,6 @@ class AddressInfo:
             raise ValueError("住所は必須です")
         if not self.name:
             raise ValueError("氏名は必須です")
-        if not self.phone:
-            raise ValueError("電話番号は必須です")
 
 
 # レイアウト設定のPydanticモデル
@@ -581,18 +579,19 @@ class LabelGenerator:
 
         current_y -= name_phone_gap
 
-        # Tel.
-        c.setFont(self.font_name, label_font_size)
-        c.setFillColorRGB(0, 0, 0)
-        c.drawString(x + margin, current_y, "Tel.")
+        # Tel.（電話番号がある場合のみ描画）
+        if address.phone:
+            c.setFont(self.font_name, label_font_size)
+            c.setFillColorRGB(0, 0, 0)
+            c.drawString(x + margin, current_y, "Tel.")
 
-        current_y -= section_spacing
+            current_y -= section_spacing
 
-        # 電話番号記入エリア（括弧付き）
-        c.setFont(self.font_name, phone_font_size)
-        c.setFillColorRGB(0, 0, 0)
-        phone_text = f"( {address.phone} )"
-        c.drawString(x + margin + self.config.phone.offset_x, current_y, phone_text)
+            # 電話番号記入エリア（括弧付き）
+            c.setFont(self.font_name, phone_font_size)
+            c.setFillColorRGB(0, 0, 0)
+            phone_text = f"( {address.phone} )"
+            c.drawString(x + margin + self.config.phone.offset_x, current_y, phone_text)
 
     def _split_address(self, address: str, max_length: int = 30) -> list[str]:
         """

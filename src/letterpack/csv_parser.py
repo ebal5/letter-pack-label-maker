@@ -54,21 +54,21 @@ def parse_csv(csv_path: str) -> list[LabelData]:
     labels = []
     errors = []
 
+    # 必須カラムと任意カラムの定義（Shift_JISフォールバック処理でも使用するため、tryブロック外で定義）
+    required_columns = {
+        "to_postal",
+        "to_address",
+        "to_name",
+        "from_postal",
+        "from_address",
+        "from_name",
+    }
+    optional_columns = {"to_phone", "to_honorific", "from_phone", "from_honorific"}
+    all_columns = required_columns | optional_columns
+
     try:
         with open(csv_file, encoding="utf-8") as f:
             reader = csv.DictReader(f)
-
-            # 必須カラムのチェック
-            required_columns = {
-                "to_postal",
-                "to_address",
-                "to_name",
-                "from_postal",
-                "from_address",
-                "from_name",
-            }
-            optional_columns = {"to_phone", "to_honorific", "from_phone", "from_honorific"}
-            all_columns = required_columns | optional_columns
 
             if reader.fieldnames is None:
                 raise ValueError("CSVファイルにヘッダー行がありません")
@@ -89,7 +89,7 @@ def parse_csv(csv_path: str) -> list[LabelData]:
                     to_postal = row.get("to_postal", "").strip()
                     to_address = row.get("to_address", "").strip()
                     to_name = row.get("to_name", "").strip()
-                    to_phone = row.get("to_phone", "").strip()
+                    to_phone = row.get("to_phone", "").strip() or None
                     to_honorific = row.get("to_honorific", "").strip()
                     if not to_honorific:
                         to_honorific = "様"  # デフォルト
@@ -98,7 +98,7 @@ def parse_csv(csv_path: str) -> list[LabelData]:
                     from_postal = row.get("from_postal", "").strip()
                     from_address = row.get("from_address", "").strip()
                     from_name = row.get("from_name", "").strip()
-                    from_phone = row.get("from_phone", "").strip()
+                    from_phone = row.get("from_phone", "").strip() or None
                     from_honorific = row.get("from_honorific", "").strip()
                     # from_honorificは空文字列でもOK（敬称なし）
 
@@ -150,13 +150,13 @@ def parse_csv(csv_path: str) -> list[LabelData]:
                         to_postal = row.get("to_postal", "").strip()
                         to_address = row.get("to_address", "").strip()
                         to_name = row.get("to_name", "").strip()
-                        to_phone = row.get("to_phone", "").strip()
+                        to_phone = row.get("to_phone", "").strip() or None
                         to_honorific = row.get("to_honorific", "").strip() or "様"
 
                         from_postal = row.get("from_postal", "").strip()
                         from_address = row.get("from_address", "").strip()
                         from_name = row.get("from_name", "").strip()
-                        from_phone = row.get("from_phone", "").strip()
+                        from_phone = row.get("from_phone", "").strip() or None
                         from_honorific = row.get("from_honorific", "").strip()
 
                         try:

@@ -196,9 +196,9 @@
                         <p class="example">※ 未入力の場合は「様」が使用されます</p>
                     </div>
                     <div class="form-group">
-                        <label for="to_phone">電話番号 *</label>
+                        <label for="to_phone">電話番号</label>
                         <input type="text" id="to_phone" name="to_phone"
-                               placeholder="例: 03-1234-5678" required>
+                               placeholder="例: 03-1234-5678">
                     </div>
                 </div>
 
@@ -226,9 +226,9 @@
                         <p class="example">※ 未入力の場合は敬称なしになります</p>
                     </div>
                     <div class="form-group">
-                        <label for="from_phone">電話番号 *</label>
+                        <label for="from_phone">電話番号</label>
                         <input type="text" id="from_phone" name="from_phone"
-                               placeholder="例: 06-9876-5432" required>
+                               placeholder="例: 06-9876-5432">
                     </div>
                 </div>
 
@@ -301,7 +301,7 @@ class AddressInfo:
     postal_code: str
     address: str
     name: str
-    phone: str
+    phone: Optional[str] = None
     honorific: Optional[str] = None
 
     def __post_init__(self):
@@ -311,8 +311,6 @@ class AddressInfo:
             raise ValueError("住所は必須です")
         if not self.name:
             raise ValueError("氏名は必須です")
-        if not self.phone:
-            raise ValueError("電話番号は必須です")
 
 class LabelGenerator:
     def __init__(self, layout_mode="center", font_path=None):
@@ -531,19 +529,20 @@ class LabelGenerator:
 
         current_y -= 15
 
-        # 電話番号は細めに
-        phone_font_size = 13
-        c.setFont(self.font_name, phone_font_size)
-        phone_text = f"( {address.phone} )"
-        # 輪郭線を追加して太く見せる
-        c.setFillColorRGB(0, 0, 0)
-        c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(0.4)
+        # 電話番号は細めに（電話番号がある場合のみ描画）
+        if address.phone:
+            phone_font_size = 13
+            c.setFont(self.font_name, phone_font_size)
+            phone_text = f"( {address.phone} )"
+            # 輪郭線を追加して太く見せる
+            c.setFillColorRGB(0, 0, 0)
+            c.setStrokeColorRGB(0, 0, 0)
+            c.setLineWidth(0.4)
 
-        phone_x = x + margin + 30
-        phone_y = current_y
-        # 単純な描画（重ね描画なし）
-        c.drawString(phone_x, phone_y, phone_text)
+            phone_x = x + margin + 30
+            phone_y = current_y
+            # 単純な描画（重ね描画なし）
+            c.drawString(phone_x, phone_y, phone_text)
 
     def _split_address(self, address, max_length=30):
         if len(address) <= max_length:

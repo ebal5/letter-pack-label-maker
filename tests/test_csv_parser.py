@@ -110,8 +110,9 @@ def test_parse_csv_missing_column():
 
 def test_parse_csv_missing_required_column():
     """必須カラムが欠けている場合のテスト（修正版）"""
-    csv_content = """to_postal,to_address,to_name,from_postal,from_address,from_name,from_phone
-123-4567,東京都渋谷区XXX 1-2-3,山田太郎,987-6543,大阪府大阪市YYY 4-5-6,田中花子,06-9876-5432
+    # to_postalカラムが欠けているCSV（必須カラムの欠落）
+    csv_content = """to_address,to_name,from_postal,from_address,from_name
+東京都渋谷区XXX 1-2-3,山田太郎,987-6543,大阪府大阪市YYY 4-5-6,田中花子
 """
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:

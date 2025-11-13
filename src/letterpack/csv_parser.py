@@ -63,13 +63,11 @@ def parse_csv(csv_path: str) -> list[LabelData]:
                 "to_postal",
                 "to_address",
                 "to_name",
-                "to_phone",
                 "from_postal",
                 "from_address",
                 "from_name",
-                "from_phone",
             }
-            optional_columns = {"to_honorific", "from_honorific"}
+            optional_columns = {"to_phone", "to_honorific", "from_phone", "from_honorific"}
             all_columns = required_columns | optional_columns
 
             if reader.fieldnames is None:

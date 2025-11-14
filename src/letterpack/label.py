@@ -558,6 +558,8 @@ class LabelGenerator:
         current_y = y + height - margin_top
 
         label_font_size = int(self.config.fonts.label * font_scale)
+        # 郵便番号マーク（〒記号）は常に固定サイズ（font_scaleを適用しない）
+        postal_mark_font_size = self.config.fonts.label
         # 送り主セクションの場合は住所フォントサイズを調整
         if is_from_section:
             address_font_size = int(
@@ -590,7 +592,7 @@ class LabelGenerator:
         dotted_line_text_offset = self.config.spacing.dotted_line_text_offset
 
         # 郵便番号（〒記号付き）
-        c.setFont(self.font_name, label_font_size)
+        c.setFont(self.font_name, postal_mark_font_size)
         c.setFillColorRGB(0, 0, 0)
         postal_y = current_y  # 〒記号の位置を記録
         c.drawString(x + margin_left, postal_y, "〒")

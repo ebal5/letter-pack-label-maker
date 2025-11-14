@@ -1,0 +1,108 @@
+name: Multi-Interface Testing
+
+# ワークフローのトリガー設定
+on:
+  # PRの作成・更新時に実行
+  pull_request:
+    branches: [ main ]
+  # 手動実行も可能
+  workflow_dispatch:
+
+jobs:
+  multi-interface-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # リポジトリのチェックアウト
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Pythonのセットアップ
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # uvのインストール
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      # 依存関係のインストール（dev依存関係も含む）
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      # Playwrightのインストール
+      - name: Install Playwright browsers
+        run: |
+          uv run playwright install chromium
+          uv run playwright install-deps chromium
+
+      # テスト出力ディレクトリの作成
+      - name: Create test output directory
+        run: mkdir -p test-output
+
+      # Multi-interface テストの実行
+      - name: Run multi-interface tests
+        env:
+          TEST_OUTPUT_DIR: test-output
+        run: |
+          uv run pytest tests/test_multi_interface.py -v \
+            --tb=short \
+            --maxfail=3 \
+            -s
+
+      # テストPDFの生成確認
+      - name: Verify test PDFs were created
+        if: always()
+        run: |
+          if [ -d test-output ] && [ "$(ls -A test-output/*.pdf 2>/dev/null)" ]; then
+            echo "✓ Test PDFs generated:"
+            ls -lh test-output/*.pdf
+          else
+            echo "⚠ No test PDFs found"
+          fi
+
+      # Artifact名を動的に設定（PR番号とコミットSHA含む）
+      - name: Set artifact name
+        if: always()
+        id: artifact-name
+        run: |
+          SHORT_SHA=${GITHUB_SHA:0:7}
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "name=multi-interface-test-pr-${{ github.event.pull_request.number }}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          else
+            echo "name=multi-interface-test-main-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          fi
+
+      # 生成されたPDFをアーティファクトとしてアップロード
+      - name: Upload test PDFs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact-name.outputs.name }}
+          path: test-output/*.pdf
+          retention-days: 7
+          if-no-files-found: warn
+
+      # pytest-htmlでHTMLレポートを生成
+      - name: Generate HTML report
+        if: always()
+        run: |
+          uv pip install pytest-html
+          uv run pytest tests/test_multi_interface.py \
+            --html=test-report.html \
+            --self-contained-html \
+            --tb=short || true
+
+      # HTMLレポートをアップロード
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-${{ steps.artifact-name.outputs.name }}
+          path: test-report.html
+          retention-days: 7
+          if-no-files-found: warn

@@ -36,6 +36,8 @@ dev = [
     "pytest>=7.0.0",
     "ruff>=0.8.0",
     "ty>=0.0.1a1",
+    "pypdf2>=3.0.0",
+    "pdfplumber>=0.10.0",
 ]
 
 [project.scripts]

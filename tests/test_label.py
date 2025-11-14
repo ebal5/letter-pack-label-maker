@@ -9,7 +9,6 @@ import tempfile
 
 import pytest
 import yaml
-
 from letterpack.label import AddressInfo, LabelGenerator, create_label, load_layout_config
 
 

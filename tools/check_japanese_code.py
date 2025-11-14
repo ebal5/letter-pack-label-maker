@@ -18,14 +18,14 @@ from typing import Dict, List, Tuple
 def check_encoding(file_path: Path) -> Tuple[str, bool]:
     """ファイルのエンコーディングをチェック"""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             f.read()
         return "UTF-8", True
     except UnicodeDecodeError:
         # その他のエンコーディングを試す
         for encoding in ["shift_jis", "euc_jp", "iso2022_jp"]:
             try:
-                with open(file_path, "r", encoding=encoding) as f:
+                with open(file_path, encoding=encoding) as f:
                     f.read()
                 return encoding, False
             except UnicodeDecodeError:
@@ -41,9 +41,7 @@ def check_fullwidth_numbers(text: str, file_path: str, line_num: int) -> List[Di
 
     for match in fullwidth_pattern.finditer(text):
         # コメント内かコード内かは区別しない（すべて検出）
-        halfwidth = match.group().translate(
-            str.maketrans("０１２３４５６７８９", "0123456789")
-        )
+        halfwidth = match.group().translate(str.maketrans("０１２３４５６７８９", "0123456789"))
         issues.append(
             {
                 "file": file_path,
@@ -88,9 +86,9 @@ def check_docstrings(file_path: Path) -> List[Dict]:
     issues = []
 
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
-    except (UnicodeDecodeError, IOError):
+    except (OSError, UnicodeDecodeError):
         return issues
 
     # 関数定義を検索
@@ -198,9 +196,7 @@ def generate_report(
     else:
         print(f"⚠️ {total_issues}件の改善点があります")
         if encoding_issues:
-            print(
-                f"  - 文字コーディング: {len(encoding_issues)}件（エンコーディング変更が必要）"
-            )
+            print(f"  - 文字コーディング: {len(encoding_issues)}件（エンコーディング変更が必要）")
         if fullwidth_issues:
             print(f"  - 全角・半角: {len(fullwidth_issues)}件（修正可能）")
         if docstring_issues:
@@ -231,7 +227,8 @@ def main():
         for file_path in project_root.rglob(pattern):
             # 除外ファイル
             if any(
-                x in str(file_path) for x in [".git", "node_modules", ".venv", "__pycache__", "uv.lock"]
+                x in str(file_path)
+                for x in [".git", "node_modules", ".venv", "__pycache__", "uv.lock"]
             ):
                 continue
 
@@ -242,29 +239,24 @@ def main():
     # 2. Pythonファイルの全角・半角チェック
     print("  - 全角・半角をチェック中...")
     for file_path in project_root.rglob("*.py"):
-        if any(
-            x in str(file_path) for x in [".git", "node_modules", ".venv", "__pycache__"]
-        ):
+        if any(x in str(file_path) for x in [".git", "node_modules", ".venv", "__pycache__"]):
             continue
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 for i, line in enumerate(f, 1):
                     # コメントと文字列リテラルから日本語テキストを抽出
                     if "#" in line or '"' in line or "'" in line:
-                        fullwidth_issues.extend(
-                            check_fullwidth_numbers(line, str(file_path), i)
-                        )
+                        fullwidth_issues.extend(check_fullwidth_numbers(line, str(file_path), i))
                         fullwidth_issues.extend(check_fullwidth_alpha(line, str(file_path), i))
-        except (UnicodeDecodeError, IOError):
+        except (OSError, UnicodeDecodeError):
             pass
 
     # 3. Pythonファイルのdocstringチェック
     print("  - docstringをチェック中...")
     for file_path in project_root.rglob("*.py"):
         if any(
-            x in str(file_path)
-            for x in [".git", "node_modules", ".venv", "__pycache__", "tests"]
+            x in str(file_path) for x in [".git", "node_modules", ".venv", "__pycache__", "tests"]
         ):
             continue
 

@@ -356,6 +356,9 @@
             }
         }
 
+        // Expose to window for testing
+        window.PyodideDiagnostics = PyodideDiagnostics;
+
         /**
          * IndexedDB Font Caching
          */
@@ -432,6 +435,9 @@
             }
         }
 
+        // Expose to window for testing
+        window.FontCacheManager = FontCacheManager;
+
         /**
          * Enhanced Error Handler
          */
@@ -476,6 +482,9 @@
                 console.log('Error Report:', JSON.stringify(report, null, 2));
             }
         }
+
+        // Expose to window for testing
+        window.ErrorHandler = ErrorHandler;
 
         // Python label生成コード（Noto Sans JP使用版）
         const labelPythonCode = `

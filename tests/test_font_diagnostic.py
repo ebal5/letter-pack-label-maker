@@ -10,10 +10,13 @@ from unittest.mock import MagicMock, patch
 sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
 
 from font_diagnostic import (
+    analyze_pdf_fonts,
     check_reportlab_fonts,
     detect_environment,
     find_system_fonts,
     get_platform_font_dirs,
+    print_diagnostic_report,
+    read_label_py_font_config,
 )
 
 
@@ -125,3 +128,48 @@ def test_find_system_fonts_permission_error(mock_path_class):
     # エラーでも空の結果を返す
     assert isinstance(fonts, dict)
     assert all(isinstance(v, list) for v in fonts.values())
+
+
+def test_analyze_pdf_fonts_not_found():
+    """存在しないPDFのテスト"""
+    result = analyze_pdf_fonts("/nonexistent/file.pdf")
+    assert result is None
+
+
+def test_analyze_pdf_fonts_none_path():
+    """Noneパスのテスト"""
+    result = analyze_pdf_fonts(None)
+    assert result is None
+
+
+def test_print_diagnostic_report(capsys):
+    """診断レポート出力のテスト"""
+    env_info = detect_environment()
+    system_fonts = find_system_fonts()
+    reportlab_fonts = check_reportlab_fonts()
+    label_config = read_label_py_font_config()
+
+    print_diagnostic_report(env_info, system_fonts, reportlab_fonts, label_config)
+
+    captured = capsys.readouterr()
+    assert "フォント診断レポート" in captured.out
+    assert "実行環境" in captured.out
+    assert "ReportLab登録フォント" in captured.out
+    assert "システムフォント" in captured.out
+
+
+def test_print_diagnostic_report_with_pdf_fonts(capsys):
+    """PDF情報を含む診断レポート出力のテスト"""
+    env_info = detect_environment()
+    system_fonts = find_system_fonts()
+    reportlab_fonts = check_reportlab_fonts()
+    label_config = read_label_py_font_config()
+    pdf_fonts = {
+        "TestFont": {"embedded": True, "type": "/Type1"},
+    }
+
+    print_diagnostic_report(env_info, system_fonts, reportlab_fonts, label_config, pdf_fonts)
+
+    captured = capsys.readouterr()
+    assert "PDF内のフォント情報" in captured.out
+    assert "TestFont" in captured.out

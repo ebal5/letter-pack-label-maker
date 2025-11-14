@@ -22,6 +22,14 @@
 - ✅ 静的HTMLページ（サーバー不要、Pyodide使用）
 - 🔜 品名フィールドの追加（予定）
 
+## 要件
+
+- **Python**: 3.11 以上（v0.2.0 より）
+  - Python 3.10以前をご使用の方は [リリース履歴](https://github.com/ebal5/letter-pack-label-maker/releases) から古いバージョンをご利用ください
+- **ReportLab**: 4.4.4 以上
+- **Flask**: 3.1.0 以上（Webインターフェース使用時）
+- **Pydantic**: 2.8.0 以上
+
 ## インストール
 
 このプロジェクトは [uv](https://github.com/astral-sh/uv) を使用して依存関係を管理しています。
@@ -412,6 +420,28 @@ uv run pytest
 uv run ruff format src tests
 uv run ruff check --fix src tests
 ```
+
+### フォント診断ツール
+
+フォント環境の問題をデバッグするための診断スクリプトが用意されています：
+
+```bash
+# 基本的なフォント診断
+python tools/font_diagnostic.py
+
+# PDF内のフォント情報も確認する場合
+pip install pypdf  # または: uv pip install pypdf
+python tools/font_diagnostic.py --pdf output.pdf
+```
+
+**診断内容**:
+- ✅ 実行環境の検出（Docker/Pyodide/ローカル）
+- ✅ システムにインストールされているフォント
+- ✅ ReportLabに登録されているフォント
+- ✅ フォントフォールバック設定
+- ✅ PDF内のフォント情報（オプション）
+
+詳細は `.claude/skills/font-diagnostic/README.md` を参照してください。
 
 ### 静的WebUIのテスト
 

@@ -12,10 +12,9 @@
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple
 
 
-def check_encoding(file_path: Path) -> Tuple[str, bool]:
+def check_encoding(file_path: Path) -> tuple[str, bool]:
     """ファイルのエンコーディングをチェック"""
     try:
         with open(file_path, encoding="utf-8") as f:
@@ -33,7 +32,7 @@ def check_encoding(file_path: Path) -> Tuple[str, bool]:
         return "Unknown", False
 
 
-def check_fullwidth_numbers(text: str, file_path: str, line_num: int) -> List[Dict]:
+def check_fullwidth_numbers(text: str, file_path: str, line_num: int) -> list[dict]:
     """全角数字をチェック"""
     issues = []
     # 全角数字パターン（０-９）
@@ -55,7 +54,7 @@ def check_fullwidth_numbers(text: str, file_path: str, line_num: int) -> List[Di
     return issues
 
 
-def check_fullwidth_alpha(text: str, file_path: str, line_num: int) -> List[Dict]:
+def check_fullwidth_alpha(text: str, file_path: str, line_num: int) -> list[dict]:
     """全角英字をチェック"""
     issues = []
     # 全角英字パターン
@@ -81,7 +80,7 @@ def check_fullwidth_alpha(text: str, file_path: str, line_num: int) -> List[Dict
     return issues
 
 
-def check_docstrings(file_path: Path) -> List[Dict]:
+def check_docstrings(file_path: Path) -> list[dict]:
     """docstringの有無をチェック"""
     issues = []
 
@@ -139,9 +138,9 @@ def check_docstrings(file_path: Path) -> List[Dict]:
 
 
 def generate_report(
-    encoding_issues: List[Tuple],
-    fullwidth_issues: List[Dict],
-    docstring_issues: List[Dict],
+    encoding_issues: list[tuple],
+    fullwidth_issues: list[dict],
+    docstring_issues: list[dict],
 ) -> None:
     """チェック結果をレポート形式で出力"""
     print("\n" + "=" * 60)

@@ -367,7 +367,7 @@ class LabelGenerator:
         width, height = A4
 
         label_width = 105 * mm
-        label_height = 148 * mm
+        label_height = 122 * mm  # 実測値ベース
 
         if self.layout_mode == "grid_4up":
             positions = [
@@ -392,13 +392,19 @@ class LabelGenerator:
         c.setLineWidth(0.5)
         c.rect(x_offset, y_offset, label_width, label_height)
 
-        section_height = label_height / 2
-        c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(1)
-        c.line(x_offset, y_offset + section_height, x_offset + label_width, y_offset + section_height)
+        # セクション高さを個別設定（実測値ベース）
+        to_section_height = 69 * mm    # お届け先（実測値68mm）
+        from_section_height = 53 * mm  # ご依頼主（実測値52mm）
+        divider_line_width = 1 * mm    # 区切り線
 
-        self._draw_address_section(c, to_address, x_offset, y_offset + section_height, label_width, section_height, "お届け先")
-        self._draw_address_section(c, from_address, x_offset, y_offset, label_width, section_height, "ご依頼主")
+        c.setStrokeColorRGB(0, 0, 0)
+        c.setLineWidth(divider_line_width)
+        # 区切り線の位置はご依頼主セクションの上端
+        divider_y = y_offset + from_section_height
+        c.line(x_offset, divider_y, x_offset + label_width, divider_y)
+
+        self._draw_address_section(c, to_address, x_offset, divider_y, label_width, to_section_height, "お届け先")
+        self._draw_address_section(c, from_address, x_offset, y_offset, label_width, from_section_height, "ご依頼主")
 
     def _draw_postal_boxes(self, c, postal_code, x, y):
         digits = postal_code.replace("-", "").replace("〒", "").strip()
@@ -457,8 +463,9 @@ class LabelGenerator:
         c.setStrokeColorRGB(0, 0, 0)
 
     def _draw_address_section(self, c, address, x, y, width, height, label):
-        margin = 8 * mm
-        current_y = y + height - margin
+        margin_top = 7 * mm  # 上部マージン（実測値ベース）
+        margin_left = 5 * mm  # 左右マージン
+        current_y = y + height - margin_top
 
         c.setFont(self.font_name, 9)
         c.setFillColorRGB(0, 0, 0)
@@ -466,10 +473,10 @@ class LabelGenerator:
         # 輪郭線を追加して太く見せる
         c.setStrokeColorRGB(0, 0, 0)
         c.setLineWidth(0.3)
-        c.drawString(x + margin, postal_y, "〒")
+        c.drawString(x + margin_left, postal_y, "〒")
 
         c.setFont(self.font_name, 13)
-        self._draw_postal_boxes(c, address.postal_code, x + margin + 15, postal_y - 2)
+        self._draw_postal_boxes(c, address.postal_code, x + margin_left + 15, postal_y - 2)
 
         current_y -= 15
         current_y -= 15
@@ -482,7 +489,7 @@ class LabelGenerator:
             address_lines.append(address.address3)
 
         for line in address_lines:
-            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+            self._draw_dotted_line(c, x + margin_left, current_y, x + width - margin_left)
             address_font_size = 12  # 11から12に拡大
             c.setFont(self.font_name, address_font_size)
             # 輪郭線を追加して太く見せる
@@ -490,7 +497,7 @@ class LabelGenerator:
             c.setStrokeColorRGB(0, 0, 0)
             c.setLineWidth(0.6)  # 0.4から0.6に増加
 
-            addr_x = x + margin + 4
+            addr_x = x + margin_left + 4
             addr_y = current_y + 4
             # 複数回描画で太く
             for dx in [-0.1, 0, 0.1]:
@@ -499,7 +506,7 @@ class LabelGenerator:
 
         # 残りの空欄を描画
         for _ in range(3 - len(address_lines)):
-            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+            self._draw_dotted_line(c, x + margin_left, current_y, x + width - margin_left)
             current_y -= 18
 
         current_y -= 27
@@ -507,11 +514,11 @@ class LabelGenerator:
         honorific = address.honorific if address.honorific else ""
         if honorific:
             sama_width = 8 * mm
-            name_line_end = x + width - margin - sama_width
+            name_line_end = x + width - margin_left - sama_width
         else:
-            name_line_end = x + width - margin
+            name_line_end = x + width - margin_left
 
-        self._draw_dotted_line(c, x + margin, current_y, name_line_end)
+        self._draw_dotted_line(c, x + margin_left, current_y, name_line_end)
 
         # 氏名を太く描画（フォントサイズを大きく、複数回描画で強調）
         name_font_size = 16  # 14から16に拡大
@@ -520,7 +527,7 @@ class LabelGenerator:
         c.setStrokeColorRGB(0, 0, 0)
         c.setLineWidth(1.0)  # 0.5から1.0に拡大
 
-        name_x = x + margin + 4
+        name_x = x + margin_left + 4
         name_y = current_y + 3  # フォントサイズが大きくなったので少し調整
 
         # 複数回描画して太く見せる（疑似Bold効果）
@@ -554,7 +561,7 @@ class LabelGenerator:
         c.setFillColorRGB(0, 0, 0)
         c.setStrokeColorRGB(0, 0, 0)
         c.setLineWidth(0.3)
-        c.drawString(x + margin, current_y, "Tel.")
+        c.drawString(x + margin_left, current_y, "Tel.")
 
         current_y -= 15
 
@@ -568,7 +575,7 @@ class LabelGenerator:
             c.setStrokeColorRGB(0, 0, 0)
             c.setLineWidth(0.4)
 
-            phone_x = x + margin + 30
+            phone_x = x + margin_left + 30
             phone_y = current_y
             # 単純な描画（重ね描画なし）
             c.drawString(phone_x, phone_y, phone_text)
@@ -605,7 +612,7 @@ def create_batch_labels_bytes(label_data_list, font_path=None):
     width, height = A4
 
     label_width = 105 * mm
-    label_height = 148 * mm
+    label_height = 122 * mm  # 実測値ベース
 
     positions = [
         (0, height / 2),

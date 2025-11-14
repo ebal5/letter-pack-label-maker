@@ -46,8 +46,16 @@ class LayoutConfig(BaseModel):
     """ラベルの基本寸法設定"""
 
     label_width: float = Field(default=105, gt=0, le=300, description="ラベルの幅 (mm)")
-    label_height: float = Field(default=148, gt=0, le=500, description="ラベルの高さ (mm)")
-    margin: float = Field(default=8, ge=0, le=50, description="セクション内のマージン (mm)")
+    label_height: float = Field(
+        default=122,
+        gt=0,
+        le=500,
+        description="ラベルの高さ (mm)。実測値122mm（枠外側）に基づく。セクション高さの合計と一致させること",
+    )
+    margin_top: float = Field(default=7, ge=0, le=50, description="セクション内の上部マージン (mm)")
+    margin_left: float = Field(
+        default=5, ge=0, le=50, description="セクション内の左右マージン (mm)"
+    )
     draw_border: bool = Field(default=True, description="デバッグ用の枠線を描画するか")
     layout_mode: Literal["center", "grid_4up"] = Field(
         default="center", description="レイアウトモード: center=中央配置, grid_4up=4丁付"
@@ -142,6 +150,26 @@ class PhoneConfig(BaseModel):
     offset_x: int = Field(default=30, ge=0, le=200, description="電話番号の左からのオフセット (px)")
 
 
+class SectionHeightConfig(BaseModel):
+    """セクション高さ設定（実測値ベース）"""
+
+    to_section_height: float = Field(
+        default=69, gt=0, le=200, description="お届け先セクションの高さ (mm)。実測値68mm"
+    )
+    from_section_height: float = Field(
+        default=53, gt=0, le=200, description="ご依頼主セクションの高さ (mm)。実測値52mm"
+    )
+    divider_line_width: float = Field(
+        default=1, gt=0, le=10, description="区切り線の太さ (mm)。実測値1mm"
+    )
+    from_section_font_scale: float = Field(
+        default=0.7,
+        gt=0,
+        le=1,
+        description="ご依頼主セクションのフォントサイズスケール（1.0=100%）",
+    )
+
+
 class LabelLayoutConfig(BaseModel):
     """レターパックラベルのレイアウト全体設定"""
 
@@ -154,6 +182,7 @@ class LabelLayoutConfig(BaseModel):
     sama: SamaConfig = Field(default_factory=SamaConfig)
     border: BorderConfig = Field(default_factory=BorderConfig)
     phone: PhoneConfig = Field(default_factory=PhoneConfig)
+    section_height: SectionHeightConfig = Field(default_factory=SectionHeightConfig)
 
 
 def load_layout_config(config_path: Optional[str] = None) -> LabelLayoutConfig:
@@ -359,33 +388,45 @@ class LabelGenerator:
             c.setLineWidth(self.config.border.line_width)
             c.rect(x_offset, y_offset, label_width, label_height)
 
-        # ラベルを上下2分割（お届け先が上、ご依頼主が下）
-        section_height = label_height / 2
+        # セクション高さを設定から取得（実測値ベース）
+        to_section_height = self.config.section_height.to_section_height * mm
+        from_section_height = self.config.section_height.from_section_height * mm
+        divider_line_width = self.config.section_height.divider_line_width * mm
 
         # 区切り線
         c.setStrokeColorRGB(0, 0, 0)  # 黒に戻す
-        c.setLineWidth(1)
-        c.line(
-            x_offset, y_offset + section_height, x_offset + label_width, y_offset + section_height
-        )
+        c.setLineWidth(divider_line_width)
+        # 区切り線の位置はご依頼主セクションの上端
+        divider_y = y_offset + from_section_height
+        c.line(x_offset, divider_y, x_offset + label_width, divider_y)
 
-        # お届け先（上半分）
+        # お届け先（上部）- フォントスケール 1.0（100%）
         self._draw_address_section(
             c,
             to_address,
             x_offset,
-            y_offset + section_height,
+            divider_y,
             label_width,
-            section_height,
+            to_section_height,
             "お届け先",
+            font_scale=1.0,
         )
 
-        # ご依頼主（下半分）
+        # ご依頼主（下部）- フォントスケールを設定から取得
         self._draw_address_section(
-            c, from_address, x_offset, y_offset, label_width, section_height, "ご依頼主"
+            c,
+            from_address,
+            x_offset,
+            y_offset,
+            label_width,
+            from_section_height,
+            "ご依頼主",
+            font_scale=self.config.section_height.from_section_font_scale,
         )
 
-    def _draw_postal_boxes(self, c: canvas.Canvas, postal_code: str, x: float, y: float):
+    def _draw_postal_boxes(
+        self, c: canvas.Canvas, postal_code: str, x: float, y: float, font_scale: float = 1.0
+    ):
         """
         郵便番号を3-4の区切り形式で描画
 
@@ -393,6 +434,7 @@ class LabelGenerator:
             c: Canvas オブジェクト
             postal_code: 郵便番号（例: "123-4567"）
             x, y: 開始座標
+            font_scale: フォントサイズのスケール（1.0=100%）
         """
         # ハイフンを除去して数字のみ抽出
         digits = postal_code.replace("-", "").replace("〒", "").strip()
@@ -402,7 +444,7 @@ class LabelGenerator:
         box_spacing = self.config.postal_box.box_spacing * mm
         box_line_width = self.config.postal_box.line_width
         text_vertical_offset = self.config.postal_box.text_vertical_offset
-        postal_font_size = self.config.fonts.postal_code
+        postal_font_size = int(self.config.fonts.postal_code * font_scale)
 
         # 太字フォントを使用（利用可能な場合）
         bold_font_name = getattr(self, "bold_font_name", self.font_name)
@@ -482,6 +524,7 @@ class LabelGenerator:
         width: float,
         height: float,
         label: str,
+        font_scale: float = 1.0,
     ):
         """
         住所セクションを描画
@@ -492,15 +535,17 @@ class LabelGenerator:
             x, y: 左下の座標
             width, height: セクションのサイズ
             label: セクションラベル（"お届け先" or "ご依頼主"）
+            font_scale: フォントサイズのスケール（1.0=100%）
         """
-        # 設定から値を取得
-        margin = self.config.layout.margin * mm
-        current_y = y + height - margin
+        # 設定から値を取得し、スケールを適用
+        margin_top = self.config.layout.margin_top * mm
+        margin_left = self.config.layout.margin_left * mm
+        current_y = y + height - margin_top
 
-        label_font_size = self.config.fonts.label
-        address_font_size = self.config.fonts.address
-        name_font_size = self.config.fonts.name
-        phone_font_size = self.config.fonts.phone
+        label_font_size = int(self.config.fonts.label * font_scale)
+        address_font_size = int(self.config.fonts.address * font_scale)
+        name_font_size = int(self.config.fonts.name * font_scale)
+        phone_font_size = int(self.config.fonts.phone * font_scale)
 
         section_spacing = self.config.spacing.section_spacing
         address_line_height = self.config.spacing.address_line_height
@@ -514,16 +559,18 @@ class LabelGenerator:
         c.setFont(self.font_name, label_font_size)
         c.setFillColorRGB(0, 0, 0)
         postal_y = current_y  # 〒記号の位置を記録
-        c.drawString(x + margin, postal_y, "〒")
+        c.drawString(x + margin_left, postal_y, "〒")
 
         # 郵便番号ボックス（〒記号と同じ高さに配置）
-        c.setFont(self.font_name, self.config.fonts.postal_code)
+        postal_font_size_scaled = int(self.config.fonts.postal_code * font_scale)
+        c.setFont(self.font_name, postal_font_size_scaled)
         c.setFillColorRGB(0, 0, 0)
         self._draw_postal_boxes(
             c,
             address.postal_code,
-            x + margin + postal_box_offset_x,
+            x + margin_left + postal_box_offset_x,
             postal_y + postal_box_offset_y,
+            font_scale=font_scale,
         )
 
         current_y -= section_spacing
@@ -539,17 +586,17 @@ class LabelGenerator:
 
         # 入力された住所を表示
         for line in address_lines:
-            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+            self._draw_dotted_line(c, x + margin_left, current_y, x + width - margin_left)
             c.setFont(self.font_name, address_font_size)
             c.drawString(
-                x + margin + dotted_line_text_offset, current_y + dotted_line_text_offset, line
+                x + margin_left + dotted_line_text_offset, current_y + dotted_line_text_offset, line
             )
             current_y -= address_line_height
 
         # 残りの空欄の点線
         remaining_lines = self.config.address.max_lines - len(address_lines)
         for _ in range(remaining_lines):
-            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+            self._draw_dotted_line(c, x + margin_left, current_y, x + width - margin_left)
             current_y -= address_line_height
 
         current_y -= address_name_gap
@@ -558,27 +605,28 @@ class LabelGenerator:
         honorific = address.honorific if address.honorific else ""
         if honorific:
             sama_width = self.config.sama.width * mm
-            name_line_end = x + width - margin - sama_width
+            name_line_end = x + width - margin_left - sama_width
         else:
-            name_line_end = x + width - margin
+            name_line_end = x + width - margin_left
 
-        self._draw_dotted_line(c, x + margin, current_y, name_line_end)
+        self._draw_dotted_line(c, x + margin_left, current_y, name_line_end)
 
         # 名前を描画
         c.setFont(self.font_name, name_font_size)
         c.setFillColorRGB(0, 0, 0)
         c.drawString(
-            x + margin + dotted_line_text_offset, current_y + dotted_line_text_offset, address.name
+            x + margin_left + dotted_line_text_offset,
+            current_y + dotted_line_text_offset,
+            address.name,
         )
 
         # 敬称を点線の右側に表示（敬称が指定されている場合のみ）
         if honorific:
             # 敬称のフォントサイズを取得（Noneの場合は名前より2pt小さい）
-            honorific_font_size = (
-                self.config.fonts.honorific
-                if self.config.fonts.honorific is not None
-                else max(name_font_size - 2, 1)
-            )
+            if self.config.fonts.honorific is not None:
+                honorific_font_size = int(self.config.fonts.honorific * font_scale)
+            else:
+                honorific_font_size = max(name_font_size - 2, 1)
             c.setFont(self.font_name, honorific_font_size)
             c.setFillColorRGB(0, 0, 0)
             sama_x = name_line_end + self.config.sama.offset * mm
@@ -590,7 +638,7 @@ class LabelGenerator:
         if address.phone:
             c.setFont(self.font_name, label_font_size)
             c.setFillColorRGB(0, 0, 0)
-            c.drawString(x + margin, current_y, "Tel.")
+            c.drawString(x + margin_left, current_y, "Tel.")
 
             current_y -= section_spacing
 
@@ -598,7 +646,7 @@ class LabelGenerator:
             c.setFont(self.font_name, phone_font_size)
             c.setFillColorRGB(0, 0, 0)
             phone_text = f"( {address.phone} )"
-            c.drawString(x + margin + self.config.phone.offset_x, current_y, phone_text)
+            c.drawString(x + margin_left + self.config.phone.offset_x, current_y, phone_text)
 
     def _split_address(self, address: str, max_length: int = 30) -> list[str]:
         """

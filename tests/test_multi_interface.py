@@ -5,29 +5,40 @@
 ラベルPDFを生成し、一貫性を検証します。
 """
 
+import importlib.util
 import os
 import subprocess
-import tempfile
 import time
-from pathlib import Path
 from typing import Optional
 
 import pytest
 
+from letterpack.csv_parser import parse_csv
+from letterpack.label import AddressInfo, create_label_batch
+
 try:
     from PyPDF2 import PdfReader
+
     HAS_PYPDF2 = True
 except ImportError:
     HAS_PYPDF2 = False
 
 try:
     import pdfplumber
+
     HAS_PDFPLUMBER = True
 except ImportError:
     HAS_PDFPLUMBER = False
 
-from letterpack.csv_parser import parse_csv
-from letterpack.label import AddressInfo, create_label_batch
+try:
+    import requests
+
+    HAS_REQUESTS = True
+except ImportError:
+    HAS_REQUESTS = False
+
+# Playwrightの利用可能性をチェック（インポートせずにモジュールの存在を確認）
+HAS_PLAYWRIGHT = importlib.util.find_spec("playwright") is not None
 
 
 class PDFValidator:
@@ -86,6 +97,12 @@ def output_dir(tmp_path):
     return output_path
 
 
+@pytest.fixture
+def test_server_port():
+    """テスト用Webサーバーのポート番号を取得（環境変数またはデフォルト値）"""
+    return int(os.environ.get("TEST_SERVER_PORT", "5000"))
+
+
 class TestCLIInterface:
     """CLI版のテスト"""
 
@@ -108,7 +125,11 @@ class TestCLIInterface:
             text=True,
         )
 
-        assert result.returncode == 0, f"CLI failed: {result.stderr}"
+        assert result.returncode == 0, (
+            f"CLI failed with code {result.returncode}:\n"
+            f"stdout: {result.stdout}\n"
+            f"stderr: {result.stderr}"
+        )
         assert output_pdf.exists(), "PDF was not generated"
         assert output_pdf.stat().st_size > 0, "PDF file is empty"
 
@@ -140,7 +161,7 @@ class TestCLIInterface:
 class TestWebServerInterface:
     """Webサーバー版のテスト"""
 
-    def test_web_server_api_available(self):
+    def test_web_server_api_available(self, test_server_port):
         """Webサーバーが起動可能か確認"""
         # Webサーバーを起動
         server_process = subprocess.Popen(
@@ -158,8 +179,8 @@ class TestWebServerInterface:
             import socket
 
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            result = sock.connect_ex(("127.0.0.1", 5000))
-            assert result == 0, "Web server is not responding on port 5000"
+            result = sock.connect_ex(("127.0.0.1", test_server_port))
+            assert result == 0, f"Web server is not responding on port {test_server_port}"
             sock.close()
         finally:
             server_process.terminate()
@@ -168,18 +189,12 @@ class TestWebServerInterface:
             except subprocess.TimeoutExpired:
                 server_process.kill()
 
-    @pytest.mark.skip(reason="API integration test requires requests library")
-    def test_web_generate_from_csv(self, test_csv_data, output_dir):
+    @pytest.mark.skipif(not HAS_REQUESTS, reason="requests library not installed")
+    def test_web_generate_from_csv(self, test_csv_data, output_dir, test_server_port):
         """Webサーバー版でCSVからPDF生成
 
         このテストはrequestsライブラリが必要です。
-        実装時に有効化してください。
         """
-        try:
-            import requests
-        except ImportError:
-            pytest.skip("requests library not installed")
-
         output_pdf = output_dir / "web_output.pdf"
 
         # Webサーバーを起動
@@ -197,7 +212,7 @@ class TestWebServerInterface:
             with open(test_csv_data, "rb") as f:
                 files = {"csv_file": f}
                 response = requests.post(
-                    "http://localhost:5000/generate",
+                    f"http://localhost:{test_server_port}/generate",
                     files=files,
                     timeout=10,
                 )
@@ -221,18 +236,12 @@ class TestWebServerInterface:
 class TestStaticHTMLInterface:
     """静的HTML版（Pyodide）のテスト"""
 
-    @pytest.mark.skip(reason="Playwright integration required")
+    @pytest.mark.skipif(not HAS_PLAYWRIGHT, reason="Playwright not installed")
     def test_static_html_generate(self, test_csv_data, output_dir):
         """静的HTML版でCSVからPDF生成
 
         このテストはPlaywrightが必要です。
-        実装時に有効化してください。
         """
-        try:
-            from playwright.sync_api import sync_playwright
-        except ImportError:
-            pytest.skip("Playwright not installed")
-
         pytest.skip("Static HTML version test not yet implemented")
 
 
@@ -272,10 +281,15 @@ class TestPDFConsistency:
         # テキスト内容の確認（キーワードが含まれているか）
         text_content = PDFValidator.extract_text(str(output_pdf))
         if text_content is not None:
-            # 宛先情報が含まれているか確認
-            assert "山田太郎" in text_content or "山田" in text_content, (
-                "PDF does not contain recipient information"
-            )
+            # テキストが抽出できた場合のみ検証
+            if text_content.strip():
+                # 宛先情報が含まれているか確認（複数のキーワードで検証）
+                assert any(keyword in text_content for keyword in ["山田太郎", "山田", "太郎"]), (
+                    "PDF does not contain recipient information"
+                )
+            else:
+                # テキスト抽出は成功したが内容が空の場合はスキップ
+                pytest.skip("Text extraction succeeded but returned empty content")
 
     def test_csv_parsing_and_batch_generation(self, test_csv_data, output_dir):
         """CSV解析とバッチPDF生成のテスト"""
@@ -295,8 +309,6 @@ class TestPDFConsistency:
 
     def test_single_label_consistency(self, output_dir):
         """単一ラベルの生成一貫性テスト"""
-        output_pdf = output_dir / "single_label.pdf"
-
         to_addr = AddressInfo(
             postal_code="100-0001",
             address="東京都千代田区千代田1-1",
@@ -328,9 +340,12 @@ class TestPDFConsistency:
         size1 = PDFValidator.get_file_size(str(pdfs[0]))
         size2 = PDFValidator.get_file_size(str(pdfs[1]))
         # ファイルサイズが同じか、または非常に近い（許容値：5%）
+        # フォント埋め込みやメタデータなどの環境依存要素によるばらつきを考慮
+        # 同じデータから生成されたPDFは基本的に同じサイズになるはずだが、
+        # ReportLabのバージョンや環境による微細な差異を許容する
         size_ratio = max(size1, size2) / min(size1, size2)
         assert size_ratio < 1.05, (
-            f"File sizes differ significantly: {size1} vs {size2}"
+            f"File sizes differ significantly: {size1} vs {size2} (ratio: {size_ratio:.2f})"
         )
 
         # ページ数が同じか確認

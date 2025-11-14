@@ -197,12 +197,15 @@ class LabelLayoutConfig(BaseModel):
     section_height: SectionHeightConfig = Field(default_factory=SectionHeightConfig)
 
 
-def load_layout_config(config_path: Optional[str] = None) -> LabelLayoutConfig:
+def load_layout_config(
+    config_path: Optional[str] = None, config_dict: Optional[dict] = None
+) -> LabelLayoutConfig:
     """
-    レイアウト設定をYAMLファイルから読み込む
+    レイアウト設定をYAMLファイルまたは辞書から読み込む
 
     Args:
         config_path: 設定ファイルのパス（Noneの場合はデフォルト設定を使用）
+        config_dict: 設定辞書（将来的にUI設定やlocalStorageから取得）
 
     Returns:
         LabelLayoutConfig: レイアウト設定
@@ -210,11 +213,28 @@ def load_layout_config(config_path: Optional[str] = None) -> LabelLayoutConfig:
     Raises:
         FileNotFoundError: 設定ファイルが見つからない場合
         ValueError: 設定ファイルの形式が不正な場合
+
+    Note:
+        - config_dictとconfig_pathの両方が指定された場合、config_dictが優先されます
+        - 将来的な拡張:
+          * UI上で設定を変更できる機能を追加
+          * 変更した設定をlocalStorageに保存
+          * ページロード時にlocalStorageから設定を読み込み
+          * 静的HTML版でのYAMLファイル読み込みは、fetch() + js-yamlで実装可能
     """
+    # 辞書が渡された場合は辞書から設定を構築
+    if config_dict is not None:
+        if not config_dict:
+            # 空の辞書の場合はデフォルト設定を返す
+            return LabelLayoutConfig()
+        # 辞書から設定オブジェクトを構築
+        return LabelLayoutConfig(**config_dict)
+
+    # ファイルパスが指定されていない場合はデフォルト設定を使用
     if config_path is None:
-        # デフォルト設定を使用
         return LabelLayoutConfig()
 
+    # YAMLファイルから設定を読み込む
     config_file = Path(config_path)
     if not config_file.exists():
         raise FileNotFoundError(f"設定ファイルが見つかりません: {config_path}")
@@ -237,15 +257,21 @@ def load_layout_config(config_path: Optional[str] = None) -> LabelLayoutConfig:
 class LabelGenerator:
     """レターパックラベルPDF生成クラス"""
 
-    def __init__(self, font_path: Optional[str] = None, config_path: Optional[str] = None):
+    def __init__(
+        self,
+        font_path: Optional[str] = None,
+        config_path: Optional[str] = None,
+        config_dict: Optional[dict] = None,
+    ):
         """
         Args:
             font_path: 日本語フォントのパス（Noneの場合はシステムフォントを試行）
             config_path: レイアウト設定ファイルのパス（Noneの場合はデフォルト設定を使用）
+            config_dict: レイアウト設定辞書（静的HTML版やUI設定から渡される場合に使用）
         """
         self.font_name = "IPAGothic"  # デフォルトフォント（_setup_fontで設定される）
         self.font_path = font_path
-        self.config = load_layout_config(config_path)
+        self.config = load_layout_config(config_path=config_path, config_dict=config_dict)
         self._setup_font()
 
     def _setup_font(self):
@@ -772,6 +798,7 @@ def create_label(
     output_path: str = "label.pdf",
     font_path: Optional[str] = None,
     config_path: Optional[str] = None,
+    config_dict: Optional[dict] = None,
 ) -> str:
     """
     ラベルPDFを生成する便利関数
@@ -782,11 +809,14 @@ def create_label(
         output_path: 出力PDFファイルパス
         font_path: 日本語フォントのパス
         config_path: レイアウト設定ファイルのパス（Noneの場合はデフォルト設定を使用）
+        config_dict: レイアウト設定辞書（静的HTML版やUI設定から渡される場合に使用）
 
     Returns:
         生成されたPDFファイルのパス
     """
-    generator = LabelGenerator(font_path=font_path, config_path=config_path)
+    generator = LabelGenerator(
+        font_path=font_path, config_path=config_path, config_dict=config_dict
+    )
     return generator.generate(to_address, from_address, output_path)
 
 
@@ -795,6 +825,7 @@ def create_label_batch(
     output_path: str = "labels.pdf",
     font_path: Optional[str] = None,
     config_path: Optional[str] = None,
+    config_dict: Optional[dict] = None,
 ) -> str:
     """
     複数のラベルを4upレイアウトで1つのPDF（複数ページ）に生成する便利関数
@@ -804,9 +835,12 @@ def create_label_batch(
         output_path: 出力PDFファイルパス
         font_path: 日本語フォントのパス
         config_path: レイアウト設定ファイルのパス（Noneの場合はデフォルト設定を使用）
+        config_dict: レイアウト設定辞書（静的HTML版やUI設定から渡される場合に使用）
 
     Returns:
         生成されたPDFファイルのパス
     """
-    generator = LabelGenerator(font_path=font_path, config_path=config_path)
+    generator = LabelGenerator(
+        font_path=font_path, config_path=config_path, config_dict=config_dict
+    )
     return generator.generate_batch(label_pairs, output_path)

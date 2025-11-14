@@ -46,8 +46,13 @@ class LayoutConfig(BaseModel):
     """ラベルの基本寸法設定"""
 
     label_width: float = Field(default=105, gt=0, le=300, description="ラベルの幅 (mm)")
-    label_height: float = Field(default=148, gt=0, le=500, description="ラベルの高さ (mm)")
-    margin: float = Field(default=8, ge=0, le=50, description="セクション内のマージン (mm)")
+    label_height: float = Field(
+        default=122,
+        gt=0,
+        le=500,
+        description="ラベルの高さ (mm)。実測値122mm（枠外側）に基づく。セクション高さの合計と一致させること",
+    )
+    margin: float = Field(default=5, ge=0, le=50, description="セクション内のマージン (mm)")
     draw_border: bool = Field(default=True, description="デバッグ用の枠線を描画するか")
     layout_mode: Literal["center", "grid_4up"] = Field(
         default="center", description="レイアウトモード: center=中央配置, grid_4up=4丁付"
@@ -146,12 +151,14 @@ class SectionHeightConfig(BaseModel):
     """セクション高さ設定（実測値ベース）"""
 
     to_section_height: float = Field(
-        default=68, gt=0, le=200, description="お届け先セクションの高さ (mm)"
+        default=69, gt=0, le=200, description="お届け先セクションの高さ (mm)。実測値68mm"
     )
     from_section_height: float = Field(
-        default=52, gt=0, le=200, description="ご依頼主セクションの高さ (mm)"
+        default=53, gt=0, le=200, description="ご依頼主セクションの高さ (mm)。実測値52mm"
     )
-    divider_line_width: float = Field(default=1, gt=0, le=10, description="区切り線の太さ (mm)")
+    divider_line_width: float = Field(
+        default=1, gt=0, le=10, description="区切り線の太さ (mm)。実測値1mm"
+    )
     from_section_font_scale: float = Field(
         default=0.7,
         gt=0,

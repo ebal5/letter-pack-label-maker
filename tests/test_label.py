@@ -172,8 +172,8 @@ def test_load_default_config():
     config = load_layout_config(None)
     assert config is not None
     assert config.layout.label_width == 105
-    assert config.layout.label_height == 148
-    assert config.layout.margin == 8
+    assert config.layout.label_height == 122  # 実測値に基づく変更
+    assert config.layout.margin == 5  # 実測値に基づく変更
     assert config.fonts.label == 9
     assert config.fonts.postal_code == 13
     assert config.fonts.address == 11
@@ -182,6 +182,11 @@ def test_load_default_config():
     assert config.postal_box.line_width == 0.5
     assert config.postal_box.text_vertical_offset == 2
     assert config.spacing.postal_box_offset_y == -2
+    # セクション高さの設定を確認
+    assert config.section_height.to_section_height == 69
+    assert config.section_height.from_section_height == 53
+    assert config.section_height.divider_line_width == 1
+    assert config.section_height.from_section_font_scale == 0.7
 
 
 def test_load_custom_config():

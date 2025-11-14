@@ -10,7 +10,6 @@ import importlib.util
 import os
 import subprocess
 import time
-from typing import Dict, Optional
 
 import pytest
 
@@ -53,7 +52,7 @@ class PDFValidator:
     """PDFの基本情報を検証するクラス"""
 
     @staticmethod
-    def get_page_count(pdf_path: str) -> Optional[int]:
+    def get_page_count(pdf_path: str) -> int | None:
         """PDFのページ数を取得"""
         if not HAS_PYPDF2:
             return None
@@ -70,7 +69,7 @@ class PDFValidator:
         return os.path.getsize(pdf_path)
 
     @staticmethod
-    def extract_text(pdf_path: str) -> Optional[str]:
+    def extract_text(pdf_path: str) -> str | None:
         """PDFからテキスト内容を抽出"""
         if not HAS_PDFPLUMBER:
             return None
@@ -84,7 +83,7 @@ class PDFValidator:
             return None
 
     @staticmethod
-    def compare_text_content(pdf_path1: str, pdf_path2: str) -> Optional[Dict]:
+    def compare_text_content(pdf_path1: str, pdf_path2: str) -> dict | None:
         """2つのPDFのテキスト内容を詳細比較
 
         Args:
@@ -139,7 +138,7 @@ class PDFValidator:
             return None
 
     @staticmethod
-    def extract_layout_positions(pdf_path: str) -> Optional[Dict]:
+    def extract_layout_positions(pdf_path: str) -> dict | None:
         """PDFから主要要素の位置情報を抽出
 
         Args:
@@ -185,8 +184,8 @@ class PDFValidator:
 
     @staticmethod
     def compare_layout_positions(
-        pos1: Dict, pos2: Dict, tolerance_mm: float = 2.0
-    ) -> Dict[str, bool]:
+        pos1: dict, pos2: dict, tolerance_mm: float = 2.0
+    ) -> dict[str, bool]:
         """2つのPDFのレイアウト位置を比較
 
         Args:

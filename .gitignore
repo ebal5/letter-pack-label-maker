@@ -74,3 +74,12 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Playwright
+node_modules/
+playwright-report/
+test-results/
+package.json
+package-lock.json
+playwright.config.js
+tests/static-webui.test.js

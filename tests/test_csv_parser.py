@@ -90,7 +90,7 @@ def test_parse_csv_missing_required_field():
 def test_parse_csv_missing_column():
     """必須カラムが欠けている場合のテスト"""
     csv_content = """to_postal,to_address1,to_address2,to_address3,to_name,to_phone,to_honorific,from_postal,from_address1,from_address2,from_address3,from_name,from_phone,from_honorific
-123-4567,東京都渋谷区XXX 1-2-3,山田太郎,03-1234-5678,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432
+123-4567,東京都渋谷区XXX 1-2-3,,,山田太郎,03-1234-5678,,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432,
 """
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
@@ -111,9 +111,8 @@ def test_parse_csv_missing_column():
 def test_parse_csv_missing_required_column():
     """必須カラムが欠けている場合のテスト（修正版）"""
     # to_postalカラムが欠けているCSV（必須カラムの欠落）
-    csv_content = """to_postal,to_address1,to_address2,to_address3,to_name,to_phone,to_honorific,from_postal,from_address1,from_address2,from_address3,from_name,from_phone,from_honorific
-to_address1,to_address2,to_address3,to_name,from_postal,from_address1,from_address2,from_address3,from_name
-東京都渋谷区XXX 1-2-3,山田太郎,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子
+    csv_content = """to_address1,to_address2,to_address3,to_name,from_postal,from_address1,from_address2,from_address3,from_name
+東京都渋谷区XXX 1-2-3,,,山田太郎,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子
 """
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
@@ -177,7 +176,7 @@ def test_parse_csv_empty_file():
 def test_validate_csv_success():
     """validate_csv関数のテスト（成功）"""
     csv_content = """to_postal,to_address1,to_address2,to_address3,to_name,to_phone,to_honorific,from_postal,from_address1,from_address2,from_address3,from_name,from_phone,from_honorific
-123-4567,東京都渋谷区XXX 1-2-3,山田太郎,03-1234-5678,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432,
+123-4567,東京都渋谷区XXX 1-2-3,,,山田太郎,03-1234-5678,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432,
 """
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
@@ -198,7 +197,7 @@ def test_validate_csv_success():
 def test_validate_csv_failure():
     """validate_csv関数のテスト（失敗）"""
     csv_content = """to_postal,to_address1,to_address2,to_address3,to_name,to_phone,to_honorific,from_postal,from_address1,from_address2,from_address3,from_name,from_phone,from_honorific
-,東京都渋谷区XXX 1-2-3,山田太郎,03-1234-5678,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432,
+,東京都渋谷区XXX 1-2-3,,,山田太郎,03-1234-5678,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432,
 """
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
@@ -219,7 +218,7 @@ def test_validate_csv_failure():
 def test_parse_csv_shift_jis_encoding():
     """Shift_JISエンコーディングのCSVファイルテスト"""
     csv_content = """to_postal,to_address1,to_address2,to_address3,to_name,to_phone,to_honorific,from_postal,from_address1,from_address2,from_address3,from_name,from_phone,from_honorific
-123-4567,東京都渋谷区XXX 1-2-3,山田太郎,03-1234-5678,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432,
+123-4567,東京都渋谷区XXX 1-2-3,,,山田太郎,03-1234-5678,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432,
 """
 
     with tempfile.NamedTemporaryFile(
@@ -241,7 +240,7 @@ def test_parse_csv_shift_jis_encoding():
 def test_parse_csv_without_phone_columns():
     """電話番号カラムがないCSVのテスト（新機能：電話番号を任意に変更）"""
     csv_content = """to_postal,to_address1,to_address2,to_address3,to_name,to_phone,to_honorific,from_postal,from_address1,from_address2,from_address3,from_name,from_phone,from_honorific
-123-4567,東京都渋谷区XXX 1-2-3,山田太郎,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,
+123-4567,東京都渋谷区XXX 1-2-3,,,山田太郎,,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,,
 """
 
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
@@ -266,7 +265,7 @@ def test_parse_csv_without_phone_columns():
 def test_parse_csv_with_empty_phone_fields():
     """電話番号カラムが存在するが空のCSVのテスト（新機能：電話番号を任意に変更）"""
     csv_content = """to_postal,to_address1,to_address2,to_address3,to_name,to_phone,to_honorific,from_postal,from_address1,from_address2,from_address3,from_name,from_phone,from_honorific
-123-4567,東京都渋谷区XXX 1-2-3,山田太郎,,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,,
+123-4567,東京都渋谷区XXX 1-2-3,,,山田太郎,,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,,
 456-7890,神奈川県横浜市ZZZ 7-8-9,,,佐藤次郎,  ,殿,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,  ,
 """
 

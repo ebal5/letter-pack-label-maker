@@ -12,10 +12,10 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Any
 
 
-def detect_environment() -> dict:
+def detect_environment() -> dict[str, Any]:
     """
     実行環境を特定
 
@@ -55,12 +55,12 @@ def get_platform_font_dirs() -> list[str]:
         ]
 
 
-def find_system_fonts() -> dict:
+def find_system_fonts() -> dict[str, list[str]]:
     """
     システムにインストールされているフォントを検索
 
     Returns:
-        dict: 見つかったフォント情報
+        dict[str, list[str]]: 見つかったフォント情報
     """
     fonts = {
         "noto_cjk": [],
@@ -128,17 +128,17 @@ def check_reportlab_fonts() -> list[str]:
         return list(registered)
     except ImportError:
         return []
-    except Exception as e:
+    except (AttributeError, RuntimeError) as e:
         print(f"警告: ReportLabのフォント確認に失敗: {e}", file=sys.stderr)
         return []
 
 
-def read_label_py_font_config() -> dict:
+def read_label_py_font_config() -> dict[str, list[str]]:
     """
     src/letterpack/label.pyのフォント設定を読み取る
 
     Returns:
-        dict: フォント設定情報
+        dict[str, list[str]]: フォント設定情報
     """
     config = {
         "primary_fonts": [],
@@ -152,7 +152,7 @@ def read_label_py_font_config() -> dict:
         return config
 
     try:
-        with open(label_py, "r", encoding="utf-8") as f:
+        with open(label_py, encoding="utf-8") as f:
             content = f.read()
 
             # IPAフォントパスを抽出
@@ -175,13 +175,13 @@ def read_label_py_font_config() -> dict:
                 if "Helvetica" in content:
                     config["fallback_fonts"].append("Helvetica")
 
-    except Exception as e:
+    except (OSError, UnicodeDecodeError) as e:
         print(f"警告: label.pyの読み取りに失敗: {e}", file=sys.stderr)
 
     return config
 
 
-def analyze_pdf_fonts(pdf_path: Optional[str] = None) -> Optional[dict]:
+def analyze_pdf_fonts(pdf_path: str | None = None) -> dict[str, dict[str, Any]] | None:
     """
     PDF内のフォント情報を分析
 
@@ -189,20 +189,32 @@ def analyze_pdf_fonts(pdf_path: Optional[str] = None) -> Optional[dict]:
         pdf_path: PDFファイルパス（Noneの場合はスキップ）
 
     Returns:
-        dict: フォント情報、またはNone
+        dict[str, dict[str, Any]] | None: フォント情報、またはNone
     """
     if not pdf_path or not Path(pdf_path).exists():
         return None
 
+    # pypdfとpypdf2の両方に対応
+    PdfReader = None  # noqa: N806
     try:
-        from pypdf import PdfReader
+        from pypdf import PdfReader  # noqa: N806
+    except ImportError:
+        try:
+            from pypdf2 import PdfReader  # noqa: N806  # type: ignore[no-redef]
+        except ImportError:
+            print("警告: pypdfまたはpypdf2のインストールが必要です", file=sys.stderr)
+            return None
 
+    if PdfReader is None:
+        return None
+
+    try:
         reader = PdfReader(pdf_path)
         fonts = {}
 
         for page in reader.pages:
             if "/Font" in page["/Resources"]:
-                for font_name, font_ref in page["/Resources"]["/Font"].items():
+                for _font_name, font_ref in page["/Resources"]["/Font"].items():
                     font_obj = font_ref.get_object()
                     if "/BaseFont" in font_obj:
                         base_font = font_obj["/BaseFont"]
@@ -212,20 +224,18 @@ def analyze_pdf_fonts(pdf_path: Optional[str] = None) -> Optional[dict]:
                         }
 
         return fonts if fonts else None
-    except ImportError:
-        return None
-    except Exception as e:
+    except (OSError, KeyError) as e:
         print(f"警告: PDF分析に失敗: {e}", file=sys.stderr)
         return None
 
 
 def print_diagnostic_report(
-    env_info: dict,
-    system_fonts: dict,
+    env_info: dict[str, Any],
+    system_fonts: dict[str, list[str]],
     reportlab_fonts: list[str],
-    label_config: dict,
-    pdf_fonts: Optional[dict] = None,
-):
+    label_config: dict[str, list[str]],
+    pdf_fonts: dict[str, dict[str, Any]] | None = None,
+) -> None:
     """
     診断レポートを出力
 
@@ -242,8 +252,10 @@ def print_diagnostic_report(
 
     # 【実行環境】
     print("【実行環境】")
-    platform_str = "Windows" if env_info["platform"] == "win32" else (
-        "macOS" if env_info["platform"] == "darwin" else "Linux"
+    platform_str = (
+        "Windows"
+        if env_info["platform"] == "win32"
+        else ("macOS" if env_info["platform"] == "darwin" else "Linux")
     )
     print(f"- プラットフォーム: {platform_str}")
     print(f"- Docker環境: {'はい ✅' if env_info['is_docker'] else 'いいえ'}")
@@ -406,7 +418,7 @@ def print_diagnostic_report(
     print("\n" + "=" * 50 + "\n")
 
 
-def diagnose_fonts(pdf_path: Optional[str] = None):
+def diagnose_fonts(pdf_path: str | None = None):
     """
     フォント環境を診断
 

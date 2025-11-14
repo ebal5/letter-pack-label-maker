@@ -67,17 +67,27 @@ def preview():
 @app.route("/save", methods=["POST"])
 def save():
     """設定をYAMLファイルとして保存"""
-    config_dict = form_to_config_dict(request.form)
+    try:
+        config_dict = form_to_config_dict(request.form)
 
-    # タイムスタンプ付きファイル名
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = Path(__file__).parent.parent / "config" / f"label_layout_custom_{timestamp}.yaml"
+        # タイムスタンプ付きファイル名
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = (
+            Path(__file__).parent.parent / "config" / f"label_layout_custom_{timestamp}.yaml"
+        )
 
-    # YAMLファイルに保存
-    with open(output_path, "w", encoding="utf-8") as f:
-        yaml.dump(config_dict, f, allow_unicode=True, default_flow_style=False)
+        # ディレクトリが存在しない場合は作成
+        output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    return jsonify({"success": True, "path": str(output_path)})
+        # YAMLファイルに保存
+        with open(output_path, "w", encoding="utf-8") as f:
+            yaml.dump(config_dict, f, allow_unicode=True, default_flow_style=False)
+
+        return jsonify({"success": True, "path": str(output_path)})
+    except OSError as e:
+        return jsonify({"success": False, "error": f"ファイル保存エラー: {str(e)}"}), 500
+    except Exception as e:
+        return jsonify({"success": False, "error": f"予期しないエラー: {str(e)}"}), 500
 
 
 @app.route("/reset")
@@ -88,6 +98,44 @@ def reset():
     else:
         config = LabelLayoutConfig()
     return jsonify(config_to_dict(config))
+
+
+def safe_float(value, default):
+    """
+    安全にfloat型に変換
+
+    Args:
+        value: 変換する値
+        default: デフォルト値
+
+    Returns:
+        float: 変換された値、または変換失敗時はデフォルト値
+    """
+    if value is None or value == "":
+        return default
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        return default
+
+
+def safe_int(value, default):
+    """
+    安全にint型に変換
+
+    Args:
+        value: 変換する値
+        default: デフォルト値
+
+    Returns:
+        int: 変換された値、または変換失敗時はデフォルト値
+    """
+    if value is None or value == "":
+        return default
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
 
 
 def form_to_config_dict(form):
@@ -103,74 +151,76 @@ def form_to_config_dict(form):
     # フォームデータをパース
     config_dict = {
         "layout": {
-            "label_width": float(form.get("layout_label_width", 105)),
-            "label_height": float(form.get("layout_label_height", 122)),
-            "margin_top": float(form.get("layout_margin_top", 7)),
-            "margin_left": float(form.get("layout_margin_left", 5)),
+            "label_width": safe_float(form.get("layout_label_width"), 105),
+            "label_height": safe_float(form.get("layout_label_height"), 122),
+            "margin_top": safe_float(form.get("layout_margin_top"), 7),
+            "margin_left": safe_float(form.get("layout_margin_left"), 5),
             "draw_border": form.get("layout_draw_border") == "true",
             "layout_mode": form.get("layout_layout_mode", "center"),
         },
         "fonts": {
-            "label": int(form.get("fonts_label", 9)),
-            "postal_code": int(form.get("fonts_postal_code", 13)),
-            "address": int(form.get("fonts_address", 11)),
-            "name": int(form.get("fonts_name", 14)),
+            "label": safe_int(form.get("fonts_label"), 9),
+            "postal_code": safe_int(form.get("fonts_postal_code"), 13),
+            "address": safe_int(form.get("fonts_address"), 11),
+            "name": safe_int(form.get("fonts_name"), 14),
             "honorific": (
-                int(form.get("fonts_honorific")) if form.get("fonts_honorific") else None
+                safe_int(form.get("fonts_honorific"), None) if form.get("fonts_honorific") else None
             ),
-            "phone": int(form.get("fonts_phone", 13)),
+            "phone": safe_int(form.get("fonts_phone"), 13),
         },
         "spacing": {
-            "section_spacing": int(form.get("spacing_section_spacing", 15)),
-            "address_line_height": int(form.get("spacing_address_line_height", 18)),
-            "address_name_gap": int(form.get("spacing_address_name_gap", 27)),
-            "name_phone_gap": int(form.get("spacing_name_phone_gap", 36)),
-            "postal_box_offset_x": int(form.get("spacing_postal_box_offset_x", 15)),
-            "postal_box_offset_y": int(form.get("spacing_postal_box_offset_y", -2)),
-            "dotted_line_text_offset": int(form.get("spacing_dotted_line_text_offset", 4)),
+            "section_spacing": safe_int(form.get("spacing_section_spacing"), 15),
+            "address_line_height": safe_int(form.get("spacing_address_line_height"), 18),
+            "address_name_gap": safe_int(form.get("spacing_address_name_gap"), 27),
+            "name_phone_gap": safe_int(form.get("spacing_name_phone_gap"), 36),
+            "postal_box_offset_x": safe_int(form.get("spacing_postal_box_offset_x"), 15),
+            "postal_box_offset_y": safe_int(form.get("spacing_postal_box_offset_y"), -2),
+            "dotted_line_text_offset": safe_int(form.get("spacing_dotted_line_text_offset"), 4),
         },
         "postal_box": {
-            "box_size": float(form.get("postal_box_box_size", 5)),
-            "box_spacing": float(form.get("postal_box_box_spacing", 1)),
-            "line_width": float(form.get("postal_box_line_width", 0.5)),
-            "text_vertical_offset": float(form.get("postal_box_text_vertical_offset", 2)),
+            "box_size": safe_float(form.get("postal_box_box_size"), 5),
+            "box_spacing": safe_float(form.get("postal_box_box_spacing"), 1),
+            "line_width": safe_float(form.get("postal_box_line_width"), 0.5),
+            "text_vertical_offset": safe_float(form.get("postal_box_text_vertical_offset"), 2),
         },
         "address": {
-            "max_length": int(form.get("address_max_length", 35)),
-            "max_lines": int(form.get("address_max_lines", 3)),
+            "max_length": safe_int(form.get("address_max_length"), 35),
+            "max_lines": safe_int(form.get("address_max_lines"), 3),
         },
         "dotted_line": {
-            "dash_length": float(form.get("dotted_line_dash_length", 2)),
-            "dash_spacing": float(form.get("dotted_line_dash_spacing", 2)),
-            "color_r": float(form.get("dotted_line_color_r", 0.5)),
-            "color_g": float(form.get("dotted_line_color_g", 0.5)),
-            "color_b": float(form.get("dotted_line_color_b", 0.5)),
+            "dash_length": safe_float(form.get("dotted_line_dash_length"), 2),
+            "dash_spacing": safe_float(form.get("dotted_line_dash_spacing"), 2),
+            "color_r": safe_float(form.get("dotted_line_color_r"), 0.5),
+            "color_g": safe_float(form.get("dotted_line_color_g"), 0.5),
+            "color_b": safe_float(form.get("dotted_line_color_b"), 0.5),
         },
         "sama": {
-            "width": float(form.get("sama_width", 8)),
-            "offset": float(form.get("sama_offset", 2)),
+            "width": safe_float(form.get("sama_width"), 8),
+            "offset": safe_float(form.get("sama_offset"), 2),
         },
         "border": {
-            "color_r": float(form.get("border_color_r", 0.8)),
-            "color_g": float(form.get("border_color_g", 0.8)),
-            "color_b": float(form.get("border_color_b", 0.8)),
-            "line_width": float(form.get("border_line_width", 0.5)),
+            "color_r": safe_float(form.get("border_color_r"), 0.8),
+            "color_g": safe_float(form.get("border_color_g"), 0.8),
+            "color_b": safe_float(form.get("border_color_b"), 0.8),
+            "line_width": safe_float(form.get("border_line_width"), 0.5),
         },
         "phone": {
-            "offset_x": int(form.get("phone_offset_x", 30)),
+            "offset_x": safe_int(form.get("phone_offset_x"), 30),
         },
         "section_height": {
-            "to_section_height": float(form.get("section_height_to_section_height", 69)),
-            "from_section_height": float(form.get("section_height_from_section_height", 53)),
-            "divider_line_width": float(form.get("section_height_divider_line_width", 1)),
-            "from_section_font_scale": float(
-                form.get("section_height_from_section_font_scale", 0.7)
+            "to_section_height": safe_float(form.get("section_height_to_section_height"), 69),
+            "from_section_height": safe_float(form.get("section_height_from_section_height"), 53),
+            "divider_line_width": safe_float(form.get("section_height_divider_line_width"), 1),
+            "from_section_font_scale": safe_float(
+                form.get("section_height_from_section_font_scale"), 0.7
             ),
-            "from_address_max_lines": int(form.get("section_height_from_address_max_lines", 2)),
-            "from_address_name_gap": int(form.get("section_height_from_address_name_gap", 9)),
-            "from_name_phone_gap": int(form.get("section_height_from_name_phone_gap", 12)),
-            "from_address_font_size_adjust": int(
-                form.get("section_height_from_address_font_size_adjust", 2)
+            "from_address_max_lines": safe_int(
+                form.get("section_height_from_address_max_lines"), 2
+            ),
+            "from_address_name_gap": safe_int(form.get("section_height_from_address_name_gap"), 9),
+            "from_name_phone_gap": safe_int(form.get("section_height_from_name_phone_gap"), 12),
+            "from_address_font_size_adjust": safe_int(
+                form.get("section_height_from_address_font_size_adjust"), 2
             ),
         },
     }
@@ -259,16 +309,22 @@ def config_to_dict(config: LabelLayoutConfig) -> dict:
 
 def main():
     """アプリケーションを起動"""
+    import os
+
+    # 環境変数でデバッグモードを制御（デフォルトはFalse）
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"
+
     print("=" * 60)
     print("レイアウト調整ツール起動中...")
     print(f"デフォルト設定ファイル: {DEFAULT_CONFIG_PATH}")
+    print(f"デバッグモード: {debug_mode}")
     print("=" * 60)
     print("\nブラウザで以下のURLを開いてください:")
     print("  http://localhost:5001")
     print("\n終了するには Ctrl+C を押してください")
     print("=" * 60)
 
-    app.run(debug=True, port=5001)
+    app.run(debug=debug_mode, port=5001)
 
 
 if __name__ == "__main__":

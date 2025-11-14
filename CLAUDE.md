@@ -46,6 +46,30 @@ uv sync --all-extras
 uv run pytest
 ```
 
+### Claude Code専用ツール
+
+このプロジェクトで利用できるClaude Code専用ツール：
+
+#### Font Diagnostic Skill
+- **ファイル**: `.claude/skills/font-diagnostic/`
+- **目的**: フォント環境の診断と問題解決
+- **トリガーキーワード**: "フォント診断", "フォント問題", "日本語が表示されない"
+- **対応環境**: Docker環境、ローカル環境（CLI）
+- **Pyodide対応**: 未対応（ブラウザでは実行不可）
+- **使用例**: "フォント環境を確認してください" → スクリプトが自動実行
+
+**詳細**: `.claude/skills/font-diagnostic/README.md` を参照
+
+**手動実行**:
+```bash
+# 基本的な診断
+python tools/font_diagnostic.py
+
+# PDF内のフォント情報も確認（pypdfが必要）
+pip install pypdf
+python tools/font_diagnostic.py --pdf output.pdf
+```
+
 ### 推奨ワークフロー
 
 1. **変更前の確認**

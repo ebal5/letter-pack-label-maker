@@ -52,7 +52,7 @@ class LayoutConfig(BaseModel):
         le=500,
         description="ラベルの高さ (mm)。実測値122mm（枠外側）に基づく。セクション高さの合計と一致させること",
     )
-    margin_top: float = Field(default=2, ge=0, le=50, description="セクション内の上部マージン (mm)")
+    margin_top: float = Field(default=7, ge=0, le=50, description="セクション内の上部マージン (mm)")
     margin_left: float = Field(
         default=5, ge=0, le=50, description="セクション内の左右マージン (mm)"
     )

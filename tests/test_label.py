@@ -173,7 +173,7 @@ def test_load_default_config():
     assert config is not None
     assert config.layout.label_width == 105
     assert config.layout.label_height == 122  # 実測値に基づく変更
-    assert config.layout.margin_top == 2  # 上部マージン
+    assert config.layout.margin_top == 7  # 上部マージン
     assert config.layout.margin_left == 5  # 左右マージン
     assert config.fonts.label == 9
     assert config.fonts.postal_code == 13

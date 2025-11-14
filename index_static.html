@@ -335,16 +335,37 @@
                 if (!pyodide) return { status: 'not_initialized' };
 
                 try {
-                    // stat() を使用してファイルの存在を確認（より信頼性が高い）
+                    // まずPyodide FSが利用可能か確認
+                    if (!pyodide.FS || typeof pyodide.FS.stat !== 'function') {
+                        return { status: 'error', error: 'Pyodide FS not available' };
+                    }
+
+                    // ルートディレクトリの内容を確認（デバッグ用）
+                    let rootFiles = [];
+                    try {
+                        rootFiles = pyodide.FS.readdir('/');
+                        console.log('Pyodide FS root files:', rootFiles);
+                    } catch (readdirError) {
+                        console.warn('FS.readdir() failed:', readdirError);
+                    }
+
+                    // stat() を使用してファイルの存在を確認
                     const stat = pyodide.FS.stat('/NotoSansJP-Bold.ttf');
+                    console.log('Font stat result:', stat);
                     return {
                         status: stat && stat.size > 0 ? 'loaded' : 'missing',
                         path: '/NotoSansJP-Bold.ttf',
                         size: stat ? stat.size : 0
                     };
                 } catch (e) {
-                    // ファイルが存在しない場合はエラーになる
-                    return { status: 'missing', path: '/NotoSansJP-Bold.ttf', error: e.message };
+                    // 詳細なエラー情報を記録
+                    console.error('_checkFontStatus() error:', e);
+                    return {
+                        status: 'missing',
+                        path: '/NotoSansJP-Bold.ttf',
+                        error: e.message || String(e),
+                        errorDetails: e.toString()
+                    };
                 }
             }
 

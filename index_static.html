@@ -967,7 +967,13 @@ def parse_csv_string(csv_content):
 
                     // Pyodideの仮想ファイルシステムに保存
                     stepStart = performance.now();
-                    pyodide.FS.writeFile('/NotoSansJP-Bold.ttf', fontBytes);
+                    try {
+                        pyodide.FS.writeFile('/NotoSansJP-Bold.ttf', fontBytes);
+                        console.log(`フォント書き込み成功: ${fontBytes.length} bytes`);
+                    } catch (writeError) {
+                        console.error('フォント書き込み失敗:', writeError);
+                        throw writeError; // 上位のcatchに伝播
+                    }
 
                     // 書き込み完了を確認（stat を使用）
                     try {
@@ -975,6 +981,7 @@ def parse_csv_string(csv_content):
                         console.log(`フォントマウント確認: size=${stat.size}, mode=${stat.mode}`);
                     } catch (e) {
                         console.warn('フォントマウント確認失敗:', e);
+                        // stat失敗はwarningのみ（書き込みは成功している可能性）
                     }
 
                     // 最小値を保証（非常に高速な場合でも0.001ms以上）
@@ -984,7 +991,13 @@ def parse_csv_string(csv_content):
                 } catch (fontError) {
                     ErrorHandler.logError('FontLoading', fontError);
                     console.warn('Noto Sans JP Bold のダウンロードに失敗、フォールバックを使用:', fontError.message);
-                    window.pyodideMetrics.fontDownload = performance.now() - stepStart;
+                    // エラー時もメトリクスを記録（どちらで失敗したか判断できない場合は両方設定）
+                    if (!window.pyodideMetrics.fontDownload) {
+                        window.pyodideMetrics.fontDownload = performance.now() - stepStart;
+                    }
+                    if (!window.pyodideMetrics.fontMount) {
+                        window.pyodideMetrics.fontMount = 0.001; // エラー時は最小値
+                    }
                 }
 
                 loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> Python コードをロード中...';

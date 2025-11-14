@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal, Optional
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
@@ -195,6 +195,22 @@ class LabelLayoutConfig(BaseModel):
     border: BorderConfig = Field(default_factory=BorderConfig)
     phone: PhoneConfig = Field(default_factory=PhoneConfig)
     section_height: SectionHeightConfig = Field(default_factory=SectionHeightConfig)
+
+    @model_validator(mode="after")
+    def validate_section_heights(self) -> "LabelLayoutConfig":
+        """セクション高さの合計がlabel_heightと一致することを検証"""
+        total_height = (
+            self.section_height.to_section_height + self.section_height.from_section_height
+        )
+
+        # 誤差0.1mm許容
+        if abs(total_height - self.layout.label_height) > 0.1:
+            raise ValueError(
+                f"セクション高さの合計 ({total_height}mm) が "
+                f"label_height ({self.layout.label_height}mm) と一致しません。"
+            )
+
+        return self
 
 
 def load_layout_config(

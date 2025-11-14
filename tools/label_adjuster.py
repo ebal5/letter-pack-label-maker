@@ -10,6 +10,7 @@ from pathlib import Path
 
 import yaml
 from flask import Flask, jsonify, render_template, request, send_file
+from pydantic import ValidationError
 
 from letterpack.label import AddressInfo, LabelLayoutConfig, create_label, load_layout_config
 
@@ -53,15 +54,26 @@ def index():
 @app.route("/preview", methods=["POST"])
 def preview():
     """フォームデータからPDFを生成"""
-    # フォームデータを辞書に変換
-    config_dict = form_to_config_dict(request.form)
+    try:
+        # フォームデータを辞書に変換
+        config_dict = form_to_config_dict(request.form)
 
-    # PDFを生成
-    pdf_buffer = io.BytesIO()
-    create_label(SAMPLE_TO, SAMPLE_FROM, pdf_buffer, config_dict=config_dict)
-    pdf_buffer.seek(0)
+        # PDFを生成
+        pdf_buffer = io.BytesIO()
+        create_label(SAMPLE_TO, SAMPLE_FROM, pdf_buffer, config_dict=config_dict)
+        pdf_buffer.seek(0)
 
-    return send_file(pdf_buffer, mimetype="application/pdf")
+        return send_file(pdf_buffer, mimetype="application/pdf")
+    except ValidationError as e:
+        # Pydanticバリデーションエラー
+        error_msg = "\n".join([f"{err['loc']}: {err['msg']}" for err in e.errors()])
+        return (
+            jsonify({"success": False, "error": f"設定値が不正です:\n{error_msg}"}),
+            400,
+        )
+    except Exception as e:
+        # その他のエラー
+        return jsonify({"success": False, "error": f"PDF生成エラー: {str(e)}"}), 500
 
 
 @app.route("/save", methods=["POST"])

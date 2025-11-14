@@ -157,7 +157,7 @@ address:
   # 最大行数（お届け先）
   # デフォルト: 3行
   # 推奨範囲: 2-5行
-  # 注意: ご依頼主の最大行数は section_heights.from_address_max_lines で設定
+  # 注意: ご依頼主の最大行数は section_height.from_address_max_lines で設定
   max_lines: 3
 
 # ========================================
@@ -225,7 +225,7 @@ phone:
 # ========================================
 # レターパックの実測値に基づくセクション高さ設定
 # 合計: to_section_height + from_section_height = label_height
-section_heights:
+section_height:
   # お届け先セクションの高さ（mm単位）
   # デフォルト: 69mm（実測値68mm）
   # 推奨範囲: 60-80mm
@@ -294,14 +294,14 @@ section_heights:
 #   color_b: 0.8  # 青っぽい点線
 #
 # 例5: ご依頼主セクションのフォントサイズを調整
-# section_heights:
+# section_height:
 #   from_section_font_scale: 0.8  # デフォルト: 0.7
 #   from_address_font_size_adjust: 3  # デフォルト: 2pt
 #
 # 例6: セクション高さをカスタマイズ
 # layout:
 #   label_height: 130  # デフォルト: 122mm
-# section_heights:
+# section_height:
 #   to_section_height: 75  # デフォルト: 69mm
 #   from_section_height: 55  # デフォルト: 53mm
 #

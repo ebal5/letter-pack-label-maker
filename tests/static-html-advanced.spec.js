@@ -272,8 +272,9 @@ test.describe('Pyodide Integration Advanced Tests', () => {
         window.ErrorHandler.logError('TestContext', new Error('Test error'));
       });
 
-      // コンソールに出力されることを確認
-      await page.waitForFunction(() => logs.length > 0, { timeout: 5000 });
+      // 少し待機してからログを確認
+      await page.waitForTimeout(500);
+      expect(logs.length).toBeGreaterThan(0);
       console.log('✅ エラーログが出力されました');
     });
   });

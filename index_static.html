@@ -335,13 +335,16 @@
                 if (!pyodide) return { status: 'not_initialized' };
 
                 try {
-                    const fontExists = pyodide.FS.analyzePath('/NotoSansJP-Bold.ttf').exists;
+                    // stat() を使用してファイルの存在を確認（より信頼性が高い）
+                    const stat = pyodide.FS.stat('/NotoSansJP-Bold.ttf');
                     return {
-                        status: fontExists ? 'loaded' : 'missing',
-                        path: '/NotoSansJP-Bold.ttf'
+                        status: stat && stat.size > 0 ? 'loaded' : 'missing',
+                        path: '/NotoSansJP-Bold.ttf',
+                        size: stat ? stat.size : 0
                     };
                 } catch (e) {
-                    return { status: 'error', error: e.message };
+                    // ファイルが存在しない場合はエラーになる
+                    return { status: 'missing', path: '/NotoSansJP-Bold.ttf', error: e.message };
                 }
             }
 
@@ -426,7 +429,13 @@
                         const request = store.clear();
 
                         request.onerror = () => reject(request.error);
-                        request.onsuccess = () => resolve(true);
+
+                        // トランザクションの完了を待つ（確実にコミットされるように）
+                        transaction.oncomplete = () => {
+                            db.close(); // DBをクローズして確実にフラッシュ
+                            resolve(true);
+                        };
+                        transaction.onerror = () => reject(transaction.error);
                     });
                 } catch (e) {
                     console.warn('Font cache clear error:', e);
@@ -959,9 +968,19 @@ def parse_csv_string(csv_content):
                     // Pyodideの仮想ファイルシステムに保存
                     stepStart = performance.now();
                     pyodide.FS.writeFile('/NotoSansJP-Bold.ttf', fontBytes);
-                    window.pyodideMetrics.fontMount = performance.now() - stepStart;
 
-                    console.log(`Noto Sans JP Bold フォント${fromCache ? 'キャッシュ' : 'ダウンロード'}完了 (${Math.round(fontBytes.length / 1024 / 1024 * 100) / 100}MB)`);
+                    // 書き込み完了を確認（stat を使用）
+                    try {
+                        const stat = pyodide.FS.stat('/NotoSansJP-Bold.ttf');
+                        console.log(`フォントマウント確認: size=${stat.size}, mode=${stat.mode}`);
+                    } catch (e) {
+                        console.warn('フォントマウント確認失敗:', e);
+                    }
+
+                    // 最小値を保証（非常に高速な場合でも0.001ms以上）
+                    window.pyodideMetrics.fontMount = Math.max(performance.now() - stepStart, 0.001);
+
+                    console.log(`Noto Sans JP Bold フォントの${fromCache ? 'キャッシュ' : 'ダウンロード'}完了 (${Math.round(fontBytes.length / 1024 / 1024 * 100) / 100}MB)`);
                 } catch (fontError) {
                     ErrorHandler.logError('FontLoading', fontError);
                     console.warn('Noto Sans JP Bold のダウンロードに失敗、フォールバックを使用:', fontError.message);

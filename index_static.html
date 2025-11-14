@@ -303,10 +303,10 @@
         let pyodide = null;
         let pythonInitialized = false;
 
-        // Python label生成コード（Noto Sans JP使用版）
+        // Python label生成コード（Noto Sans JP使用版 + Pydantic設定モデル）
         const labelPythonCode = `
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Optional, Literal
 from io import BytesIO
 
 from reportlab.pdfgen import canvas
@@ -315,6 +315,112 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+
+# Pydantic互換のデータクラス（Pydanticなしで動作させるため、標準dataclassを使用）
+@dataclass
+class LayoutConfig:
+    """ラベルの基本寸法設定"""
+    label_width: float = 105
+    label_height: float = 122
+    margin_top: float = 7
+    margin_left: float = 5
+    draw_border: bool = True
+    layout_mode: str = "center"  # "center" or "grid_4up"
+
+@dataclass
+class FontsConfig:
+    """フォントサイズ設定"""
+    label: int = 9
+    postal_code: int = 13
+    address: int = 11
+    name: int = 14
+    honorific: Optional[int] = None
+    phone: int = 13
+
+@dataclass
+class SpacingConfig:
+    """要素間のスペーシング設定"""
+    section_spacing: int = 15
+    address_line_height: int = 18
+    address_name_gap: int = 27
+    name_phone_gap: int = 36
+    postal_box_offset_x: int = 15
+    postal_box_offset_y: int = -2
+    dotted_line_text_offset: int = 4
+
+@dataclass
+class PostalBoxConfig:
+    """郵便番号ボックス設定"""
+    box_size: float = 5
+    box_spacing: float = 1
+    line_width: float = 0.5
+    text_vertical_offset: float = 2
+
+@dataclass
+class AddressLayoutConfig:
+    """住所レイアウト設定"""
+    max_length: int = 35
+    max_lines: int = 3
+
+@dataclass
+class DottedLineConfig:
+    """点線スタイル設定"""
+    dash_length: float = 2
+    dash_spacing: float = 2
+    color_r: float = 0.5
+    color_g: float = 0.5
+    color_b: float = 0.5
+
+@dataclass
+class SamaConfig:
+    """「様」の配置設定"""
+    width: float = 8
+    offset: float = 2
+
+@dataclass
+class BorderConfig:
+    """枠線スタイル設定（デバッグ用）"""
+    color_r: float = 0.8
+    color_g: float = 0.8
+    color_b: float = 0.8
+    line_width: float = 0.5
+
+@dataclass
+class PhoneConfig:
+    """電話番号の配置設定"""
+    offset_x: int = 30
+
+@dataclass
+class SectionHeightConfig:
+    """セクション高さ設定（実測値ベース）"""
+    to_section_height: float = 69
+    from_section_height: float = 53
+    divider_line_width: float = 1
+    from_section_font_scale: float = 0.7
+    from_address_max_lines: int = 2
+    from_address_name_gap: int = 9
+    from_name_phone_gap: int = 12
+    from_address_font_size_adjust: int = 2
+
+@dataclass
+class LabelLayoutConfig:
+    """レターパックラベルのレイアウト全体設定"""
+    layout: LayoutConfig = field(default_factory=LayoutConfig)
+    fonts: FontsConfig = field(default_factory=FontsConfig)
+    spacing: SpacingConfig = field(default_factory=SpacingConfig)
+    postal_box: PostalBoxConfig = field(default_factory=PostalBoxConfig)
+    address: AddressLayoutConfig = field(default_factory=AddressLayoutConfig)
+    dotted_line: DottedLineConfig = field(default_factory=DottedLineConfig)
+    sama: SamaConfig = field(default_factory=SamaConfig)
+    border: BorderConfig = field(default_factory=BorderConfig)
+    phone: PhoneConfig = field(default_factory=PhoneConfig)
+    section_height: SectionHeightConfig = field(default_factory=SectionHeightConfig)
+
+def load_layout_config(config_path=None):
+    """レイアウト設定をロード（YAML読み込みは次のタスクで実装）"""
+    if config_path is None:
+        return LabelLayoutConfig()
+    raise NotImplementedError("YAML loading will be implemented in the next task")
 
 @dataclass
 class AddressInfo:
@@ -335,41 +441,54 @@ class AddressInfo:
             raise ValueError("氏名は必須です")
 
 class LabelGenerator:
-    def __init__(self, layout_mode="center", font_path=None):
-        # Noto Sans JPフォントを優先的に使用
-        if font_path:
+    def __init__(self, font_path=None, config_path=None):
+        self.font_name = "IPAGothic"
+        self.font_path = font_path
+        self.config = load_layout_config(config_path)
+        self._setup_font()
+
+    def _setup_font(self):
+        """フォント設定"""
+        self.bold_font_name = None
+
+        if self.font_path:
             try:
-                pdfmetrics.registerFont(TTFont("NotoSansJP", font_path))
-                self.font_name = "NotoSansJP"
+                pdfmetrics.registerFont(TTFont("CustomFont", self.font_path))
+                self.font_name = "CustomFont"
+                self.bold_font_name = "CustomFont"
+                return
             except Exception as e:
-                print(f"Noto Sans JPの登録に失敗: {e}")
-                self._fallback_font()
-        else:
-            self._fallback_font()
+                print(f"警告: カスタムフォントの読み込みに失敗しました: {e}")
+                print("デフォルトフォントを使用します")
 
-        self.layout_mode = layout_mode
-
-    def _fallback_font(self):
-        """フォールバック処理"""
+        # フォールバック: IPAGothic → HeiseiMin-W3 → HeiseiKakuGo-W5 → Helvetica
         try:
             pdfmetrics.registerFont(UnicodeCIDFont("HeiseiMin-W3"))
             self.font_name = "HeiseiMin-W3"
-        except:
+            self.bold_font_name = "HeiseiMin-W3"
+            print("警告: IPAフォントが見つかりません。HeiseiMin-W3を使用します")
+        except Exception as e:
+            print(f"警告: HeiseiMin-W3の登録に失敗しました: {e}")
             try:
                 pdfmetrics.registerFont(UnicodeCIDFont("HeiseiKakuGo-W5"))
                 self.font_name = "HeiseiKakuGo-W5"
-            except:
+                self.bold_font_name = "HeiseiKakuGo-W5"
+                print("警告: HeiseiKakuGo-W5を使用します")
+            except Exception as e2:
+                print(f"警告: HeiseiKakuGo-W5の登録にも失敗しました: {e2}")
                 self.font_name = "Helvetica"
+                self.bold_font_name = "Helvetica-Bold"
+                print("警告: 日本語フォントが利用できません。Helveticaを使用します")
 
     def generate(self, to_address, from_address):
         buffer = BytesIO()
         c = canvas.Canvas(buffer, pagesize=A4)
         width, height = A4
 
-        label_width = 105 * mm
-        label_height = 148 * mm
+        label_width = self.config.layout.label_width * mm
+        label_height = self.config.layout.label_height * mm
 
-        if self.layout_mode == "grid_4up":
+        if self.config.layout.layout_mode == "grid_4up":
             positions = [
                 (0, height / 2),
                 (width / 2, height / 2),
@@ -388,45 +507,58 @@ class LabelGenerator:
         return buffer.getvalue()
 
     def _draw_single_label(self, c, to_address, from_address, x_offset, y_offset, label_width, label_height):
-        c.setStrokeColorRGB(0.8, 0.8, 0.8)
-        c.setLineWidth(0.5)
-        c.rect(x_offset, y_offset, label_width, label_height)
+        if self.config.layout.draw_border:
+            c.setStrokeColorRGB(
+                self.config.border.color_r,
+                self.config.border.color_g,
+                self.config.border.color_b,
+            )
+            c.setLineWidth(self.config.border.line_width)
+            c.rect(x_offset, y_offset, label_width, label_height)
 
-        section_height = label_height / 2
+        to_section_height = self.config.section_height.to_section_height * mm
+        from_section_height = self.config.section_height.from_section_height * mm
+        divider_line_width = self.config.section_height.divider_line_width * mm
+
         c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(1)
-        c.line(x_offset, y_offset + section_height, x_offset + label_width, y_offset + section_height)
+        c.setLineWidth(divider_line_width)
+        divider_y = y_offset + from_section_height
+        c.line(x_offset, divider_y, x_offset + label_width, divider_y)
 
-        self._draw_address_section(c, to_address, x_offset, y_offset + section_height, label_width, section_height, "お届け先")
-        self._draw_address_section(c, from_address, x_offset, y_offset, label_width, section_height, "ご依頼主")
+        self._draw_address_section(
+            c, to_address, x_offset, divider_y, label_width, to_section_height,
+            "お届け先", font_scale=1.0
+        )
+        self._draw_address_section(
+            c, from_address, x_offset, y_offset, label_width, from_section_height,
+            "ご依頼主", font_scale=self.config.section_height.from_section_font_scale
+        )
 
-    def _draw_postal_boxes(self, c, postal_code, x, y):
+    def _draw_postal_boxes(self, c, postal_code, x, y, font_scale=1.0):
         digits = postal_code.replace("-", "").replace("〒", "").strip()
-        box_size = 5 * mm
-        box_spacing = 1 * mm
-        postal_font_size = 13
+        box_size = self.config.postal_box.box_size * mm
+        box_spacing = self.config.postal_box.box_spacing * mm
+        box_line_width = self.config.postal_box.line_width
+        text_vertical_offset = self.config.postal_box.text_vertical_offset
+        postal_font_size = int(self.config.fonts.postal_code * font_scale)
 
-        c.setLineWidth(0.5)
+        bold_font_name = getattr(self, "bold_font_name", self.font_name)
+        c.setLineWidth(box_line_width)
 
         for i in range(3):
             box_x = x + i * (box_size + box_spacing)
             c.rect(box_x, y, box_size, box_size)
             if i < len(digits):
-                c.setFont(self.font_name, postal_font_size)
-                text_width = c.stringWidth(digits[i], self.font_name, postal_font_size)
+                c.setFont(bold_font_name, postal_font_size)
+                text_width = c.stringWidth(digits[i], bold_font_name, postal_font_size)
                 text_x = box_x + (box_size - text_width) / 2
-                text_y = y + (box_size - postal_font_size) / 2 + 2
-                # 輪郭線を追加して太く見せる
-                c.setFillColorRGB(0, 0, 0)
-                c.setStrokeColorRGB(0, 0, 0)
-                c.setLineWidth(0.6)  # 0.4から0.6に増加
-                # 複数回描画で太く
-                for dx in [-0.1, 0, 0.1]:
-                    c.drawString(text_x + dx, text_y, digits[i])
+                text_y = y + (box_size - postal_font_size) / 2 + text_vertical_offset
+                c.drawString(text_x, text_y, digits[i])
 
         separator_x = x + 3 * (box_size + box_spacing)
         separator_y = y + box_size / 2
         separator_width = box_spacing * 1.5
+        c.setLineWidth(box_line_width)
         c.line(separator_x, separator_y, separator_x + separator_width, separator_y)
 
         offset_x = separator_x + separator_width + box_spacing
@@ -435,143 +567,137 @@ class LabelGenerator:
             c.rect(box_x, y, box_size, box_size)
             digit_index = i + 3
             if digit_index < len(digits):
-                c.setFont(self.font_name, postal_font_size)
-                text_width = c.stringWidth(digits[digit_index], self.font_name, postal_font_size)
+                c.setFont(bold_font_name, postal_font_size)
+                text_width = c.stringWidth(digits[digit_index], bold_font_name, postal_font_size)
                 text_x = box_x + (box_size - text_width) / 2
-                text_y = y + (box_size - postal_font_size) / 2 + 2
-                # 輪郭線を追加して太く見せる
-                c.setFillColorRGB(0, 0, 0)
-                c.setStrokeColorRGB(0, 0, 0)
-                c.setLineWidth(0.6)  # 0.4から0.6に増加
-                # 複数回描画で太く
-                for dx in [-0.1, 0, 0.1]:
-                    c.drawString(text_x + dx, text_y, digits[digit_index])
+                text_y = y + (box_size - postal_font_size) / 2 + text_vertical_offset
+                c.drawString(text_x, text_y, digits[digit_index])
 
         c.setLineWidth(1)
 
     def _draw_dotted_line(self, c, x1, y, x2):
-        c.setDash(2, 2)
-        c.setStrokeColorRGB(0.5, 0.5, 0.5)
+        c.setDash(self.config.dotted_line.dash_length, self.config.dotted_line.dash_spacing)
+        c.setStrokeColorRGB(
+            self.config.dotted_line.color_r,
+            self.config.dotted_line.color_g,
+            self.config.dotted_line.color_b,
+        )
         c.line(x1, y, x2, y)
         c.setDash()
         c.setStrokeColorRGB(0, 0, 0)
 
-    def _draw_address_section(self, c, address, x, y, width, height, label):
-        margin = 8 * mm
-        current_y = y + height - margin
+    def _draw_address_section(self, c, address, x, y, width, height, label, font_scale=1.0):
+        is_from_section = label == "ご依頼主"
 
-        c.setFont(self.font_name, 9)
+        margin_top = self.config.layout.margin_top * mm
+        margin_left = self.config.layout.margin_left * mm
+        current_y = y + height - margin_top
+
+        label_font_size = int(self.config.fonts.label * font_scale)
+        postal_mark_font_size = self.config.fonts.label
+
+        if is_from_section:
+            address_font_size = int(
+                (self.config.fonts.address + self.config.section_height.from_address_font_size_adjust) * font_scale
+            )
+        else:
+            address_font_size = int(self.config.fonts.address * font_scale)
+
+        name_font_size = int(self.config.fonts.name * font_scale)
+        phone_font_size = int(self.config.fonts.phone * font_scale)
+
+        section_spacing = self.config.spacing.section_spacing
+        address_line_height = self.config.spacing.address_line_height
+        address_name_gap = (
+            self.config.section_height.from_address_name_gap if is_from_section
+            else self.config.spacing.address_name_gap
+        )
+        name_phone_gap = (
+            self.config.section_height.from_name_phone_gap if is_from_section
+            else self.config.spacing.name_phone_gap
+        )
+        postal_box_offset_x = self.config.spacing.postal_box_offset_x
+        postal_box_offset_y = self.config.spacing.postal_box_offset_y
+        dotted_line_text_offset = self.config.spacing.dotted_line_text_offset
+
+        c.setFont(self.font_name, postal_mark_font_size)
         c.setFillColorRGB(0, 0, 0)
         postal_y = current_y
-        # 輪郭線を追加して太く見せる
-        c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(0.3)
-        c.drawString(x + margin, postal_y, "〒")
+        c.drawString(x + margin_left, postal_y, "〒")
 
-        c.setFont(self.font_name, 13)
-        self._draw_postal_boxes(c, address.postal_code, x + margin + 15, postal_y - 2)
+        postal_font_size_scaled = int(self.config.fonts.postal_code * font_scale)
+        c.setFont(self.font_name, postal_font_size_scaled)
+        c.setFillColorRGB(0, 0, 0)
+        self._draw_postal_boxes(
+            c, address.postal_code,
+            x + margin_left + postal_box_offset_x,
+            postal_y + postal_box_offset_y,
+            font_scale=font_scale
+        )
 
-        current_y -= 15
-        current_y -= 15
+        current_y -= section_spacing
+        current_y -= section_spacing
 
-        # 住所を3行に分けて描画
         address_lines = [address.address1]
         if address.address2:
             address_lines.append(address.address2)
         if address.address3:
             address_lines.append(address.address3)
 
+        max_address_lines = (
+            self.config.section_height.from_address_max_lines if is_from_section
+            else self.config.address.max_lines
+        )
+
         for line in address_lines:
-            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
-            address_font_size = 12  # 11から12に拡大
+            self._draw_dotted_line(c, x + margin_left, current_y, x + width - margin_left)
             c.setFont(self.font_name, address_font_size)
-            # 輪郭線を追加して太く見せる
-            c.setFillColorRGB(0, 0, 0)
-            c.setStrokeColorRGB(0, 0, 0)
-            c.setLineWidth(0.6)  # 0.4から0.6に増加
+            c.drawString(x + margin_left + dotted_line_text_offset, current_y + dotted_line_text_offset, line)
+            current_y -= address_line_height
 
-            addr_x = x + margin + 4
-            addr_y = current_y + 4
-            # 複数回描画で太く
-            for dx in [-0.1, 0, 0.1]:
-                c.drawString(addr_x + dx, addr_y, line)
-            current_y -= 18
+        remaining_lines = max_address_lines - len(address_lines)
+        for _ in range(remaining_lines):
+            self._draw_dotted_line(c, x + margin_left, current_y, x + width - margin_left)
+            current_y -= address_line_height
 
-        # 残りの空欄を描画
-        for _ in range(3 - len(address_lines)):
-            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
-            current_y -= 18
-
-        current_y -= 27
+        current_y -= address_name_gap
 
         honorific = address.honorific if address.honorific else ""
         if honorific:
-            sama_width = 8 * mm
-            name_line_end = x + width - margin - sama_width
+            sama_width = self.config.sama.width * mm
+            name_line_end = x + width - margin_left - sama_width
         else:
-            name_line_end = x + width - margin
+            name_line_end = x + width - margin_left
 
-        self._draw_dotted_line(c, x + margin, current_y, name_line_end)
+        self._draw_dotted_line(c, x + margin_left, current_y, name_line_end)
 
-        # 氏名を太く描画（フォントサイズを大きく、複数回描画で強調）
-        name_font_size = 16  # 14から16に拡大
         c.setFont(self.font_name, name_font_size)
         c.setFillColorRGB(0, 0, 0)
-        c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(1.0)  # 0.5から1.0に拡大
-
-        name_x = x + margin + 4
-        name_y = current_y + 3  # フォントサイズが大きくなったので少し調整
-
-        # 複数回描画して太く見せる（疑似Bold効果）
-        offsets = [
-            (0, 0),
-            (0.15, 0),
-            (-0.15, 0),
-            (0, 0.15),
-            (0, -0.15),
-        ]
-        for dx, dy in offsets:
-            c.drawString(name_x + dx, name_y + dy, address.name)
+        c.drawString(x + margin_left + dotted_line_text_offset, current_y + dotted_line_text_offset, address.name)
 
         if honorific:
-            # 敬称は氏名より少し細く
-            honorific_font_size = 14
+            if self.config.fonts.honorific is not None:
+                honorific_font_size = int(self.config.fonts.honorific * font_scale)
+            else:
+                honorific_font_size = max(name_font_size - 2, 1)
             c.setFont(self.font_name, honorific_font_size)
-            c.setStrokeColorRGB(0, 0, 0)
-            c.setLineWidth(0.5)
-            sama_x = name_line_end + 2 * mm
-            sama_y = current_y + 4  # 氏名より小さいので位置調整
-
-            # 敬称は単純な重ね描画（3回）
-            for dx in [-0.1, 0, 0.1]:
-                c.drawString(sama_x + dx, sama_y, honorific)
-
-        current_y -= 36
-
-        c.setFont(self.font_name, 9)
-        # 輪郭線を追加して太く見せる
-        c.setFillColorRGB(0, 0, 0)
-        c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(0.3)
-        c.drawString(x + margin, current_y, "Tel.")
-
-        current_y -= 15
-
-        # 電話番号は細めに（電話番号がある場合のみ描画）
-        if address.phone:
-            phone_font_size = 13
-            c.setFont(self.font_name, phone_font_size)
-            phone_text = f"( {address.phone} )"
-            # 輪郭線を追加して太く見せる
             c.setFillColorRGB(0, 0, 0)
-            c.setStrokeColorRGB(0, 0, 0)
-            c.setLineWidth(0.4)
+            sama_x = name_line_end + self.config.sama.offset * mm
+            c.drawString(sama_x, current_y + dotted_line_text_offset, honorific)
 
-            phone_x = x + margin + 30
-            phone_y = current_y
-            # 単純な描画（重ね描画なし）
-            c.drawString(phone_x, phone_y, phone_text)
+        current_y -= name_phone_gap
+
+        if address.phone:
+            c.setFont(self.font_name, label_font_size)
+            c.setFillColorRGB(0, 0, 0)
+            c.drawString(x + margin_left, current_y, "Tel.")
+
+            current_y -= section_spacing
+
+            c.setFont(self.font_name, phone_font_size)
+            c.setFillColorRGB(0, 0, 0)
+            phone_text = f"( {address.phone} )"
+            c.drawString(x + margin_left + self.config.phone.offset_x, current_y, phone_text)
 
     def _split_address(self, address, max_length=30):
         if len(address) <= max_length:
@@ -593,7 +719,9 @@ class LabelGenerator:
         return lines
 
 def create_label_bytes(to_info, from_info, layout_mode="center", font_path=None):
-    generator = LabelGenerator(layout_mode=layout_mode, font_path=font_path)
+    generator = LabelGenerator(font_path=font_path, config_path=None)
+    # layout_modeは設定オブジェクトに反映
+    generator.config.layout.layout_mode = layout_mode
     return generator.generate(to_info, from_info)
 
 def create_batch_labels_bytes(label_data_list, font_path=None):
@@ -604,8 +732,9 @@ def create_batch_labels_bytes(label_data_list, font_path=None):
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    label_width = 105 * mm
-    label_height = 148 * mm
+    generator = LabelGenerator(font_path=font_path, config_path=None)
+    label_width = generator.config.layout.label_width * mm
+    label_height = generator.config.layout.label_height * mm
 
     positions = [
         (0, height / 2),
@@ -613,8 +742,6 @@ def create_batch_labels_bytes(label_data_list, font_path=None):
         (0, 0),
         (width / 2, 0),
     ]
-
-    generator = LabelGenerator(layout_mode="center", font_path=font_path)
 
     for page_start in range(0, len(label_data_list), 4):
         page_labels = label_data_list[page_start:page_start + 4]

@@ -332,25 +332,30 @@
             }
 
             static _checkFontStatus() {
-                if (!pyodide) return { status: 'not_initialized' };
+                // windowオブジェクトから確実にpyodideを取得
+                const pyodideInstance = window.pyodide || pyodide;
+
+                if (!pyodideInstance) {
+                    return { status: 'not_initialized', error: 'pyodide is null or undefined' };
+                }
 
                 try {
                     // まずPyodide FSが利用可能か確認
-                    if (!pyodide.FS || typeof pyodide.FS.stat !== 'function') {
+                    if (!pyodideInstance.FS || typeof pyodideInstance.FS.stat !== 'function') {
                         return { status: 'error', error: 'Pyodide FS not available' };
                     }
 
                     // ルートディレクトリの内容を確認（デバッグ用）
                     let rootFiles = [];
                     try {
-                        rootFiles = pyodide.FS.readdir('/');
+                        rootFiles = pyodideInstance.FS.readdir('/');
                         console.log('Pyodide FS root files:', rootFiles);
                     } catch (readdirError) {
                         console.warn('FS.readdir() failed:', readdirError);
                     }
 
                     // stat() を使用してファイルの存在を確認
-                    const stat = pyodide.FS.stat('/NotoSansJP-Bold.ttf');
+                    const stat = pyodideInstance.FS.stat('/NotoSansJP-Bold.ttf');
                     console.log('Font stat result:', stat);
                     return {
                         status: stat && stat.size > 0 ? 'loaded' : 'missing',
@@ -944,6 +949,8 @@ def parse_csv_string(csv_content):
                 pyodide = await loadPyodide({
                     indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/"
                 });
+                // Pyodideをwindowに公開（診断APIからアクセス可能にする）
+                window.pyodide = pyodide;
                 window.pyodideMetrics.pyodideLoad = performance.now() - stepStart;
 
                 loadingStatus.innerHTML = '<div class="spinner" style="margin-right: 10px;"></div> ReportLabをインストール中...';

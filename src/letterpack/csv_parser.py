@@ -43,8 +43,9 @@ def parse_csv(csv_path: str) -> list[LabelData]:
 
     CSV形式:
         - ヘッダー行必須
-        - カラム: to_postal, to_address, to_name, to_phone, to_honorific,
-                 from_postal, from_address, from_name, from_phone, from_honorific
+        - カラム: to_postal, to_address1, to_address2, to_address3, to_name, to_phone, to_honorific,
+                 from_postal, from_address1, from_address2, from_address3, from_name, from_phone, from_honorific
+        - address2, address3は任意
         - to_honorific省略時は「様」、from_honorific省略時は敬称なし
     """
     csv_file = Path(csv_path)
@@ -57,13 +58,22 @@ def parse_csv(csv_path: str) -> list[LabelData]:
     # 必須カラムと任意カラムの定義（Shift_JISフォールバック処理でも使用するため、tryブロック外で定義）
     required_columns = {
         "to_postal",
-        "to_address",
+        "to_address1",
         "to_name",
         "from_postal",
-        "from_address",
+        "from_address1",
         "from_name",
     }
-    optional_columns = {"to_phone", "to_honorific", "from_phone", "from_honorific"}
+    optional_columns = {
+        "to_address2",
+        "to_address3",
+        "to_phone",
+        "to_honorific",
+        "from_address2",
+        "from_address3",
+        "from_phone",
+        "from_honorific",
+    }
     all_columns = required_columns | optional_columns
 
     try:
@@ -87,7 +97,9 @@ def parse_csv(csv_path: str) -> list[LabelData]:
                 try:
                     # お届け先
                     to_postal = row.get("to_postal", "").strip()
-                    to_address = row.get("to_address", "").strip()
+                    to_address1 = row.get("to_address1", "").strip()
+                    to_address2 = row.get("to_address2", "").strip() or None
+                    to_address3 = row.get("to_address3", "").strip() or None
                     to_name = row.get("to_name", "").strip()
                     to_phone = row.get("to_phone", "").strip() or None
                     to_honorific = row.get("to_honorific", "").strip()
@@ -96,7 +108,9 @@ def parse_csv(csv_path: str) -> list[LabelData]:
 
                     # ご依頼主
                     from_postal = row.get("from_postal", "").strip()
-                    from_address = row.get("from_address", "").strip()
+                    from_address1 = row.get("from_address1", "").strip()
+                    from_address2 = row.get("from_address2", "").strip() or None
+                    from_address3 = row.get("from_address3", "").strip() or None
                     from_name = row.get("from_name", "").strip()
                     from_phone = row.get("from_phone", "").strip() or None
                     from_honorific = row.get("from_honorific", "").strip()
@@ -106,7 +120,9 @@ def parse_csv(csv_path: str) -> list[LabelData]:
                     try:
                         to_info = AddressInfo(
                             postal_code=to_postal,
-                            address=to_address,
+                            address1=to_address1,
+                            address2=to_address2,
+                            address3=to_address3,
                             name=to_name,
                             phone=to_phone,
                             honorific=to_honorific,
@@ -118,7 +134,9 @@ def parse_csv(csv_path: str) -> list[LabelData]:
                     try:
                         from_info = AddressInfo(
                             postal_code=from_postal,
-                            address=from_address,
+                            address1=from_address1,
+                            address2=from_address2,
+                            address3=from_address3,
                             name=from_name,
                             phone=from_phone,
                             honorific=from_honorific,
@@ -148,13 +166,17 @@ def parse_csv(csv_path: str) -> list[LabelData]:
                 for row_number, row in enumerate(reader, start=2):
                     try:
                         to_postal = row.get("to_postal", "").strip()
-                        to_address = row.get("to_address", "").strip()
+                        to_address1 = row.get("to_address1", "").strip()
+                        to_address2 = row.get("to_address2", "").strip() or None
+                        to_address3 = row.get("to_address3", "").strip() or None
                         to_name = row.get("to_name", "").strip()
                         to_phone = row.get("to_phone", "").strip() or None
                         to_honorific = row.get("to_honorific", "").strip() or "様"
 
                         from_postal = row.get("from_postal", "").strip()
-                        from_address = row.get("from_address", "").strip()
+                        from_address1 = row.get("from_address1", "").strip()
+                        from_address2 = row.get("from_address2", "").strip() or None
+                        from_address3 = row.get("from_address3", "").strip() or None
                         from_name = row.get("from_name", "").strip()
                         from_phone = row.get("from_phone", "").strip() or None
                         from_honorific = row.get("from_honorific", "").strip()
@@ -162,7 +184,9 @@ def parse_csv(csv_path: str) -> list[LabelData]:
                         try:
                             to_info = AddressInfo(
                                 postal_code=to_postal,
-                                address=to_address,
+                                address1=to_address1,
+                                address2=to_address2,
+                                address3=to_address3,
                                 name=to_name,
                                 phone=to_phone,
                                 honorific=to_honorific,
@@ -174,7 +198,9 @@ def parse_csv(csv_path: str) -> list[LabelData]:
                         try:
                             from_info = AddressInfo(
                                 postal_code=from_postal,
-                                address=from_address,
+                                address1=from_address1,
+                                address2=from_address2,
+                                address3=from_address3,
                                 name=from_name,
                                 phone=from_phone,
                                 honorific=from_honorific,

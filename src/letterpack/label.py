@@ -168,6 +168,18 @@ class SectionHeightConfig(BaseModel):
         le=1,
         description="ご依頼主セクションのフォントサイズスケール（1.0=100%）",
     )
+    from_address_max_lines: int = Field(
+        default=2, gt=0, le=10, description="ご依頼主セクションの住所の最大行数"
+    )
+    from_address_name_gap: int = Field(
+        default=9, ge=0, le=100, description="ご依頼主セクションの住所と名前の間隔 (px)"
+    )
+    from_name_phone_gap: int = Field(
+        default=12, ge=0, le=100, description="ご依頼主セクションの名前と電話番号の間隔 (px)"
+    )
+    from_address_font_size_adjust: int = Field(
+        default=2, ge=0, le=10, description="ご依頼主セクションの住所フォントサイズ調整 (+pt)"
+    )
 
 
 class LabelLayoutConfig(BaseModel):
@@ -537,26 +549,50 @@ class LabelGenerator:
             label: セクションラベル（"お届け先" or "ご依頼主"）
             font_scale: フォントサイズのスケール（1.0=100%）
         """
+        # 送り主セクションかどうかを判定
+        is_from_section = label == "ご依頼主"
+
         # 設定から値を取得し、スケールを適用
         margin_top = self.config.layout.margin_top * mm
         margin_left = self.config.layout.margin_left * mm
         current_y = y + height - margin_top
 
         label_font_size = int(self.config.fonts.label * font_scale)
-        address_font_size = int(self.config.fonts.address * font_scale)
+        # 郵便番号マーク（〒記号）は常に固定サイズ（font_scaleを適用しない）
+        postal_mark_font_size = self.config.fonts.label
+        # 送り主セクションの場合は住所フォントサイズを調整
+        if is_from_section:
+            address_font_size = int(
+                (
+                    self.config.fonts.address
+                    + self.config.section_height.from_address_font_size_adjust
+                )
+                * font_scale
+            )
+        else:
+            address_font_size = int(self.config.fonts.address * font_scale)
         name_font_size = int(self.config.fonts.name * font_scale)
         phone_font_size = int(self.config.fonts.phone * font_scale)
 
         section_spacing = self.config.spacing.section_spacing
         address_line_height = self.config.spacing.address_line_height
-        address_name_gap = self.config.spacing.address_name_gap
-        name_phone_gap = self.config.spacing.name_phone_gap
+        # 送り主セクションの場合は専用のマージンを使用
+        address_name_gap = (
+            self.config.section_height.from_address_name_gap
+            if is_from_section
+            else self.config.spacing.address_name_gap
+        )
+        name_phone_gap = (
+            self.config.section_height.from_name_phone_gap
+            if is_from_section
+            else self.config.spacing.name_phone_gap
+        )
         postal_box_offset_x = self.config.spacing.postal_box_offset_x
         postal_box_offset_y = self.config.spacing.postal_box_offset_y
         dotted_line_text_offset = self.config.spacing.dotted_line_text_offset
 
         # 郵便番号（〒記号付き）
-        c.setFont(self.font_name, label_font_size)
+        c.setFont(self.font_name, postal_mark_font_size)
         c.setFillColorRGB(0, 0, 0)
         postal_y = current_y  # 〒記号の位置を記録
         c.drawString(x + margin_left, postal_y, "〒")
@@ -584,6 +620,13 @@ class LabelGenerator:
         if address.address3:
             address_lines.append(address.address3)
 
+        # 送り主セクションの場合は最大行数を専用設定から取得
+        max_address_lines = (
+            self.config.section_height.from_address_max_lines
+            if is_from_section
+            else self.config.address.max_lines
+        )
+
         # 入力された住所を表示
         for line in address_lines:
             self._draw_dotted_line(c, x + margin_left, current_y, x + width - margin_left)
@@ -594,7 +637,7 @@ class LabelGenerator:
             current_y -= address_line_height
 
         # 残りの空欄の点線
-        remaining_lines = self.config.address.max_lines - len(address_lines)
+        remaining_lines = max_address_lines - len(address_lines)
         for _ in range(remaining_lines):
             self._draw_dotted_line(c, x + margin_left, current_y, x + width - margin_left)
             current_y -= address_line_height

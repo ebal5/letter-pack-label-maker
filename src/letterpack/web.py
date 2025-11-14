@@ -273,17 +273,17 @@ HTML_TEMPLATE = r"""
         }
 
         // 郵便番号から住所を自動補完する関数
-        async function searchAddress(postalCode, addressFieldId) {
-            // 住所フィールドの要素を取得
-            const addressField = document.getElementById(addressFieldId);
+        async function searchAddress(postalCode, addressFieldIdPrefix) {
+            // 住所1行目フィールドの要素を取得
+            const addressField = document.getElementById(addressFieldIdPrefix + '1');
 
-            // 住所が既に入力されている場合は何もしない
+            // 住所1行目が既に入力されている場合は何もしない
             if (addressField.value.trim() !== '') {
                 return;
             }
 
             // 既存の選択肢があれば削除
-            const existingChoices = document.getElementById(addressFieldId + '_choices');
+            const existingChoices = document.getElementById(addressFieldIdPrefix + '1_choices');
             if (existingChoices) {
                 existingChoices.remove();
             }
@@ -310,16 +310,16 @@ HTML_TEMPLATE = r"""
 
                 if (data.addresses && data.addresses.length > 0) {
                     if (data.addresses.length === 1) {
-                        // 1つの結果の場合は直接入力
+                        // 1つの結果の場合は直接入力（1行目のみ）
                         const addr = data.addresses[0].ja;
                         const address = addr.prefecture + addr.address1 + addr.address2 + (addr.address3 || '');
-                        // 住所フィールドが空の場合のみ自動補完
+                        // 住所1行目フィールドが空の場合のみ自動補完
                         if (addressField.value.trim() === '') {
                             addressField.value = address;
                         }
                     } else {
                         // 複数の結果がある場合は選択肢を表示
-                        showAddressChoices(addressFieldId, data.addresses);
+                        showAddressChoices(addressFieldIdPrefix + '1', data.addresses);
                     }
                 }
             } catch (error) {
@@ -369,9 +369,19 @@ HTML_TEMPLATE = r"""
                                placeholder="例: 123-4567" required>
                     </div>
                     <div class="form-group">
-                        <label for="to_address">住所 *</label>
-                        <input type="text" id="to_address" name="to_address"
-                               placeholder="例: 東京都渋谷区XXX 1-2-3 XXXビル4F" required>
+                        <label for="to_address1">住所1行目 *</label>
+                        <input type="text" id="to_address1" name="to_address1"
+                               placeholder="例: 東京都渋谷区XXX 1-2-3" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="to_address2">住所2行目</label>
+                        <input type="text" id="to_address2" name="to_address2"
+                               placeholder="例: XXXビル4F">
+                    </div>
+                    <div class="form-group">
+                        <label for="to_address3">住所3行目</label>
+                        <input type="text" id="to_address3" name="to_address3"
+                               placeholder="">
                     </div>
                     <div class="form-group">
                         <label for="to_name">氏名 *</label>
@@ -399,9 +409,19 @@ HTML_TEMPLATE = r"""
                                placeholder="例: 987-6543" required>
                     </div>
                     <div class="form-group">
-                        <label for="from_address">住所 *</label>
-                        <input type="text" id="from_address" name="from_address"
+                        <label for="from_address1">住所1行目 *</label>
+                        <input type="text" id="from_address1" name="from_address1"
                                placeholder="例: 大阪府大阪市YYY 4-5-6" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="from_address2">住所2行目</label>
+                        <input type="text" id="from_address2" name="from_address2"
+                               placeholder="">
+                    </div>
+                    <div class="form-group">
+                        <label for="from_address3">住所3行目</label>
+                        <input type="text" id="from_address3" name="from_address3"
+                               placeholder="">
                     </div>
                     <div class="form-group">
                         <label for="from_name">氏名 *</label>
@@ -455,7 +475,7 @@ HTML_TEMPLATE = r"""
                             <input type="file" id="csv_file" name="csv_file" accept=".csv" required
                                    style="padding: 10px; border: 2px dashed #667eea; border-radius: 6px; background: #f8f9fa;">
                             <p class="example" style="margin-top: 8px;">
-                                ※ CSV形式: to_postal, to_address, to_name, to_phone, to_honorific, from_postal, from_address, from_name, from_phone, from_honorific
+                                ※ CSV形式: to_postal, to_address1, to_address2, to_address3, to_name, to_phone, to_honorific, from_postal, from_address1, from_address2, from_address3, from_name, from_phone, from_honorific
                             </p>
                             <p class="example">
                                 ※ 4件ごとに1ページとして、複数ページのPDFを生成します
@@ -493,12 +513,16 @@ def download_sample_csv():
     # CSVデータを作成
     fieldnames = [
         "to_postal",
-        "to_address",
+        "to_address1",
+        "to_address2",
+        "to_address3",
         "to_name",
         "to_phone",
         "to_honorific",
         "from_postal",
-        "from_address",
+        "from_address1",
+        "from_address2",
+        "from_address3",
         "from_name",
         "from_phone",
         "from_honorific",
@@ -507,24 +531,32 @@ def download_sample_csv():
     sample_rows = [
         {
             "to_postal": "123-4567",
-            "to_address": "東京都渋谷区XXX 1-2-3 XXXビル4F",
+            "to_address1": "東京都渋谷区XXX 1-2-3",
+            "to_address2": "XXXビル4F",
+            "to_address3": "",
             "to_name": "山田 太郎",
             "to_phone": "03-1234-5678",
             "to_honorific": "",
             "from_postal": "987-6543",
-            "from_address": "大阪府大阪市YYY 4-5-6",
+            "from_address1": "大阪府大阪市YYY 4-5-6",
+            "from_address2": "",
+            "from_address3": "",
             "from_name": "田中 花子",
             "from_phone": "06-9876-5432",
             "from_honorific": "",
         },
         {
             "to_postal": "111-2222",
-            "to_address": "京都府京都市ZZZ 7-8-9",
+            "to_address1": "京都府京都市ZZZ 7-8-9",
+            "to_address2": "",
+            "to_address3": "",
             "to_name": "佐藤 次郎",
             "to_phone": "075-111-2222",
             "to_honorific": "様",
             "from_postal": "555-6666",
-            "from_address": "福岡県福岡市AAA 10-11-12",
+            "from_address1": "福岡県福岡市AAA 10-11-12",
+            "from_address2": "",
+            "from_address3": "",
             "from_name": "鈴木 美咲",
             "from_phone": "092-555-6666",
             "from_honorific": "一郎",
@@ -555,16 +587,20 @@ def generate_pdf():
     try:
         # フォームデータ取得
         to_postal = request.form.get("to_postal", "").strip()
-        to_address = request.form.get("to_address", "").strip()
+        to_address1 = request.form.get("to_address1", "").strip()
+        to_address2 = request.form.get("to_address2", "").strip() or None
+        to_address3 = request.form.get("to_address3", "").strip() or None
         to_name = request.form.get("to_name", "").strip()
         to_honorific = request.form.get("to_honorific", "様").strip()
-        to_phone = request.form.get("to_phone", "").strip()
+        to_phone = request.form.get("to_phone", "").strip() or None
 
         from_postal = request.form.get("from_postal", "").strip()
-        from_address = request.form.get("from_address", "").strip()
+        from_address1 = request.form.get("from_address1", "").strip()
+        from_address2 = request.form.get("from_address2", "").strip() or None
+        from_address3 = request.form.get("from_address3", "").strip() or None
         from_name = request.form.get("from_name", "").strip()
         from_honorific = request.form.get("from_honorific", "").strip()
-        from_phone = request.form.get("from_phone", "").strip()
+        from_phone = request.form.get("from_phone", "").strip() or None
 
         # レイアウトモード取得
         layout_mode = request.form.get("layout_mode", "center").strip()
@@ -572,7 +608,9 @@ def generate_pdf():
         # AddressInfo作成（バリデーション含む）
         to_info = AddressInfo(
             postal_code=to_postal,
-            address=to_address,
+            address1=to_address1,
+            address2=to_address2,
+            address3=to_address3,
             name=to_name,
             phone=to_phone,
             honorific=to_honorific,
@@ -580,7 +618,9 @@ def generate_pdf():
 
         from_info = AddressInfo(
             postal_code=from_postal,
-            address=from_address,
+            address1=from_address1,
+            address2=from_address2,
+            address3=from_address3,
             name=from_name,
             phone=from_phone,
             honorific=from_honorific,

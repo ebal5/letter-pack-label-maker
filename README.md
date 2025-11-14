@@ -64,9 +64,9 @@ uv run python -m letterpack.cli --csv addresses.csv --output labels.pdf
 #### CSVファイル形式
 
 ```csv
-to_postal,to_address,to_name,to_phone,to_honorific,from_postal,from_address,from_name,from_phone,from_honorific
-123-4567,東京都渋谷区XXX 1-2-3,山田太郎,03-1234-5678,様,987-6543,大阪府大阪市YYY 4-5-6,田中花子,06-9876-5432,
-456-7890,神奈川県横浜市ZZZ 7-8-9,佐藤次郎,045-1234-5678,殿,987-6543,大阪府大阪市YYY 4-5-6,田中花子,06-9876-5432,
+to_postal,to_address1,to_address2,to_address3,to_name,to_phone,to_honorific,from_postal,from_address1,from_address2,from_address3,from_name,from_phone,from_honorific
+123-4567,東京都渋谷区XXX 1-2-3,XXXビル4F,,山田太郎,03-1234-5678,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432,
+456-7890,神奈川県横浜市ZZZ 7-8-9,,,佐藤次郎,045-1234-5678,殿,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432,
 ```
 
 - ヘッダー行必須

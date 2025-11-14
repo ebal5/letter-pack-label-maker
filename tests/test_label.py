@@ -34,7 +34,7 @@ def test_address_info_creation():
     """AddressInfoの作成テスト"""
     addr = AddressInfo(
         postal_code="123-4567",
-        address="東京都渋谷区XXX 1-2-3",
+        address1="東京都渋谷区XXX 1-2-3",
         name="山田太郎",
         phone="03-1234-5678",
     )
@@ -47,7 +47,7 @@ def test_address_info_without_phone():
     # 電話番号を指定しない場合
     addr1 = AddressInfo(
         postal_code="123-4567",
-        address="東京都渋谷区XXX 1-2-3",
+        address1="東京都渋谷区XXX 1-2-3",
         name="山田太郎",
     )
     assert addr1.phone is None
@@ -55,7 +55,7 @@ def test_address_info_without_phone():
     # 電話番号にNoneを明示的に指定する場合
     addr2 = AddressInfo(
         postal_code="456-7890",
-        address="大阪府大阪市YYY 4-5-6",
+        address1="大阪府大阪市YYY 4-5-6",
         name="田中花子",
         phone=None,
     )
@@ -65,23 +65,23 @@ def test_address_info_without_phone():
 def test_address_info_validation():
     """AddressInfoのバリデーションテスト"""
     with pytest.raises(ValueError):
-        AddressInfo(postal_code="", address="住所", name="名前", phone="電話")
+        AddressInfo(postal_code="", address1="住所", name="名前", phone="電話")
 
     with pytest.raises(ValueError):
-        AddressInfo(postal_code="123", address="", name="名前", phone="電話")
+        AddressInfo(postal_code="123", address1="", name="名前", phone="電話")
 
 
 def test_label_generation():
     """PDF生成テスト"""
     to_addr = AddressInfo(
         postal_code="123-4567",
-        address="東京都渋谷区XXX 1-2-3",
+        address1="東京都渋谷区XXX 1-2-3",
         name="山田太郎",
         phone="03-1234-5678",
     )
     from_addr = AddressInfo(
         postal_code="987-6543",
-        address="大阪府大阪市YYY 4-5-6",
+        address1="大阪府大阪市YYY 4-5-6",
         name="田中花子",
         phone="06-9876-5432",
     )
@@ -105,13 +105,13 @@ def test_label_generation_without_phone():
     """電話番号なしでPDF生成テスト（新機能：電話番号を任意に変更）"""
     to_addr = AddressInfo(
         postal_code="123-4567",
-        address="東京都渋谷区XXX 1-2-3",
+        address1="東京都渋谷区XXX 1-2-3",
         name="山田太郎",
         phone=None,
     )
     from_addr = AddressInfo(
         postal_code="987-6543",
-        address="大阪府大阪市YYY 4-5-6",
+        address1="大阪府大阪市YYY 4-5-6",
         name="田中花子",
         phone=None,
     )
@@ -138,13 +138,13 @@ def test_label_generator_class():
 
     to_addr = AddressInfo(
         postal_code="100-0001",
-        address="東京都千代田区千代田1-1",
+        address1="東京都千代田区千代田1-1",
         name="テスト太郎",
         phone="03-0000-0000",
     )
     from_addr = AddressInfo(
         postal_code="530-0001",
-        address="大阪府大阪市北区梅田1-1",
+        address1="大阪府大阪市北区梅田1-1",
         name="テスト花子",
         phone="06-0000-0000",
     )
@@ -171,8 +171,9 @@ def test_load_default_config():
     config = load_layout_config(None)
     assert config is not None
     assert config.layout.label_width == 105
-    assert config.layout.label_height == 148
-    assert config.layout.margin == 8
+    assert config.layout.label_height == 122  # 実測値に基づく変更
+    assert config.layout.margin_top == 7  # 上部マージン
+    assert config.layout.margin_left == 5  # 左右マージン
     assert config.fonts.label == 9
     assert config.fonts.postal_code == 13
     assert config.fonts.address == 11
@@ -181,6 +182,11 @@ def test_load_default_config():
     assert config.postal_box.line_width == 0.5
     assert config.postal_box.text_vertical_offset == 2
     assert config.spacing.postal_box_offset_y == -2
+    # セクション高さの設定を確認
+    assert config.section_height.to_section_height == 69
+    assert config.section_height.from_section_height == 53
+    assert config.section_height.divider_line_width == 1
+    assert config.section_height.from_section_font_scale == 0.7
 
 
 def test_load_custom_config():
@@ -188,7 +194,7 @@ def test_load_custom_config():
     # 一時的な設定ファイルを作成
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_file:
         config_data = {
-            "layout": {"label_width": 150, "label_height": 220, "margin": 10},
+            "layout": {"label_width": 150, "label_height": 220, "margin_top": 3, "margin_left": 10},
             "fonts": {"label": 10, "postal_code": 12, "address": 12, "name": 16, "phone": 12},
         }
         yaml.dump(config_data, tmp_file)
@@ -198,7 +204,8 @@ def test_load_custom_config():
         config = load_layout_config(config_path)
         assert config.layout.label_width == 150
         assert config.layout.label_height == 220
-        assert config.layout.margin == 10
+        assert config.layout.margin_top == 3
+        assert config.layout.margin_left == 10
         assert config.fonts.label == 10
         assert config.fonts.postal_code == 12
     finally:
@@ -248,13 +255,13 @@ def test_label_generation_with_custom_config():
     """カスタム設定でのPDF生成テスト"""
     to_addr = AddressInfo(
         postal_code="123-4567",
-        address="東京都渋谷区XXX 1-2-3",
+        address1="東京都渋谷区XXX 1-2-3",
         name="設定太郎",
         phone="03-1234-5678",
     )
     from_addr = AddressInfo(
         postal_code="987-6543",
-        address="大阪府大阪市YYY 4-5-6",
+        address1="大阪府大阪市YYY 4-5-6",
         name="設定花子",
         phone="06-9876-5432",
     )
@@ -290,7 +297,7 @@ def test_label_generator_with_custom_config():
     # カスタム設定を作成
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_config:
         config_data = {
-            "layout": {"margin": 12},
+            "layout": {"margin_top": 3, "margin_left": 12},
             "fonts": {"name": 16},
         }
         yaml.dump(config_data, tmp_config)
@@ -298,7 +305,8 @@ def test_label_generator_with_custom_config():
 
     try:
         generator = LabelGenerator(config_path=config_path)
-        assert generator.config.layout.margin == 12
+        assert generator.config.layout.margin_top == 3
+        assert generator.config.layout.margin_left == 12
         assert generator.config.fonts.name == 16
         # デフォルト値も正しく設定されているか確認
         assert generator.config.layout.label_width == 105
@@ -311,13 +319,13 @@ def test_grid_4up_layout():
     """4丁付レイアウトのテスト"""
     to_addr = AddressInfo(
         postal_code="123-4567",
-        address="東京都渋谷区XXX 1-2-3",
+        address1="東京都渋谷区XXX 1-2-3",
         name="4丁付太郎",
         phone="03-1234-5678",
     )
     from_addr = AddressInfo(
         postal_code="987-6543",
-        address="大阪府大阪市YYY 4-5-6",
+        address1="大阪府大阪市YYY 4-5-6",
         name="4丁付花子",
         phone="06-9876-5432",
     )
@@ -358,14 +366,14 @@ def test_create_label_batch():
         (
             AddressInfo(
                 postal_code="123-4567",
-                address="東京都渋谷区XXX 1-2-3",
+                address1="東京都渋谷区XXX 1-2-3",
                 name="山田太郎",
                 phone="03-1234-5678",
                 honorific="様",
             ),
             AddressInfo(
                 postal_code="987-6543",
-                address="大阪府大阪市YYY 4-5-6",
+                address1="大阪府大阪市YYY 4-5-6",
                 name="田中花子",
                 phone="06-9876-5432",
             ),
@@ -373,14 +381,14 @@ def test_create_label_batch():
         (
             AddressInfo(
                 postal_code="456-7890",
-                address="神奈川県横浜市ZZZ 7-8-9",
+                address1="神奈川県横浜市ZZZ 7-8-9",
                 name="佐藤次郎",
                 phone="045-1234-5678",
                 honorific="殿",
             ),
             AddressInfo(
                 postal_code="987-6543",
-                address="大阪府大阪市YYY 4-5-6",
+                address1="大阪府大阪市YYY 4-5-6",
                 name="田中花子",
                 phone="06-9876-5432",
             ),
@@ -388,14 +396,14 @@ def test_create_label_batch():
         (
             AddressInfo(
                 postal_code="111-2222",
-                address="千葉県千葉市AAA 1-1-1",
+                address1="千葉県千葉市AAA 1-1-1",
                 name="鈴木三郎",
                 phone="043-1111-2222",
                 honorific="御中",
             ),
             AddressInfo(
                 postal_code="987-6543",
-                address="大阪府大阪市YYY 4-5-6",
+                address1="大阪府大阪市YYY 4-5-6",
                 name="田中花子",
                 phone="06-9876-5432",
             ),
@@ -427,13 +435,13 @@ def test_create_label_batch_5_labels():
             (
                 AddressInfo(
                     postal_code=f"{100 + i}-0001",
-                    address=f"東京都千代田区{i}-{i}-{i}",
+                    address1=f"東京都千代田区{i}-{i}-{i}",
                     name=f"テスト{i}",
                     phone=f"03-0000-000{i}",
                 ),
                 AddressInfo(
                     postal_code="999-9999",
-                    address="送信元住所",
+                    address1="送信元住所",
                     name="送信元",
                     phone="099-9999-9999",
                 ),
@@ -465,14 +473,14 @@ def test_default_honorific_font_size():
     # 敬称が設定されている場合のレンダリングを確認
     to_addr = AddressInfo(
         postal_code="123-4567",
-        address="東京都渋谷区XXX 1-2-3",
+        address1="東京都渋谷区XXX 1-2-3",
         name="山田太郎",
         phone="03-1234-5678",
         honorific="様",
     )
     from_addr = AddressInfo(
         postal_code="987-6543",
-        address="大阪府大阪市YYY 4-5-6",
+        address1="大阪府大阪市YYY 4-5-6",
         name="田中花子",
         phone="06-9876-5432",
     )
@@ -509,14 +517,14 @@ def test_custom_honorific_font_size():
 
         to_addr = AddressInfo(
             postal_code="123-4567",
-            address="東京都渋谷区XXX 1-2-3",
+            address1="東京都渋谷区XXX 1-2-3",
             name="山田太郎",
             phone="03-1234-5678",
             honorific="様",
         )
         from_addr = AddressInfo(
             postal_code="987-6543",
-            address="大阪府大阪市YYY 4-5-6",
+            address1="大阪府大阪市YYY 4-5-6",
             name="田中花子",
             phone="06-9876-5432",
         )

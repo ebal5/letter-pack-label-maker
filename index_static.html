@@ -180,9 +180,19 @@
                                placeholder="例: 123-4567" required>
                     </div>
                     <div class="form-group">
-                        <label for="to_address">住所 *</label>
-                        <input type="text" id="to_address" name="to_address"
-                               placeholder="例: 東京都渋谷区XXX 1-2-3 XXXビル4F" required>
+                        <label for="to_address1">住所1行目 *</label>
+                        <input type="text" id="to_address1" name="to_address1"
+                               placeholder="例: 東京都渋谷区XXX 1-2-3" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="to_address2">住所2行目</label>
+                        <input type="text" id="to_address2" name="to_address2"
+                               placeholder="例: XXXビル4F">
+                    </div>
+                    <div class="form-group">
+                        <label for="to_address3">住所3行目</label>
+                        <input type="text" id="to_address3" name="to_address3"
+                               placeholder="">
                     </div>
                     <div class="form-group">
                         <label for="to_name">氏名 *</label>
@@ -210,9 +220,19 @@
                                placeholder="例: 987-6543" required>
                     </div>
                     <div class="form-group">
-                        <label for="from_address">住所 *</label>
-                        <input type="text" id="from_address" name="from_address"
+                        <label for="from_address1">住所1行目 *</label>
+                        <input type="text" id="from_address1" name="from_address1"
                                placeholder="例: 大阪府大阪市YYY 4-5-6" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="from_address2">住所2行目</label>
+                        <input type="text" id="from_address2" name="from_address2"
+                               placeholder="">
+                    </div>
+                    <div class="form-group">
+                        <label for="from_address3">住所3行目</label>
+                        <input type="text" id="from_address3" name="from_address3"
+                               placeholder="">
                     </div>
                     <div class="form-group">
                         <label for="from_name">氏名 *</label>
@@ -263,8 +283,8 @@
                         <input type="file" id="csv_file" name="csv_file" accept=".csv"
                                style="padding: 10px; border: 2px dashed #667eea; border-radius: 6px; background: #f8f9fa;">
                         <p class="example">
-                            ※ CSV形式（ヘッダー行必須）: to_postal, to_address, to_name, to_phone, to_honorific,
-                            from_postal, from_address, from_name, from_phone, from_honorific
+                            ※ CSV形式（ヘッダー行必須）: to_postal, to_address1, to_address2, to_address3, to_name, to_phone, to_honorific,
+                            from_postal, from_address1, from_address2, from_address3, from_name, from_phone, from_honorific
                         </p>
                     </div>
                 </div>
@@ -299,16 +319,18 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 @dataclass
 class AddressInfo:
     postal_code: str
-    address: str
+    address1: str
     name: str
+    address2: Optional[str] = None
+    address3: Optional[str] = None
     phone: Optional[str] = None
     honorific: Optional[str] = None
 
     def __post_init__(self):
         if not self.postal_code:
             raise ValueError("郵便番号は必須です")
-        if not self.address:
-            raise ValueError("住所は必須です")
+        if not self.address1:
+            raise ValueError("住所1行目は必須です")
         if not self.name:
             raise ValueError("氏名は必須です")
 
@@ -452,8 +474,14 @@ class LabelGenerator:
         current_y -= 15
         current_y -= 15
 
-        address_lines = self._split_address(address.address, 35)
-        for line in address_lines[:3]:
+        # 住所を3行に分けて描画
+        address_lines = [address.address1]
+        if address.address2:
+            address_lines.append(address.address2)
+        if address.address3:
+            address_lines.append(address.address3)
+
+        for line in address_lines:
             self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
             address_font_size = 12  # 11から12に拡大
             c.setFont(self.font_name, address_font_size)
@@ -469,6 +497,7 @@ class LabelGenerator:
                 c.drawString(addr_x + dx, addr_y, line)
             current_y -= 18
 
+        # 残りの空欄を描画
         for _ in range(3 - len(address_lines)):
             self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
             current_y -= 18
@@ -612,10 +641,13 @@ def parse_csv_string(csv_content):
     reader = csv_module.DictReader(csv_file)
 
     required_columns = {
-        "to_postal", "to_address", "to_name", "to_phone",
-        "from_postal", "from_address", "from_name", "from_phone"
+        "to_postal", "to_address1", "to_name",
+        "from_postal", "from_address1", "from_name"
     }
-    optional_columns = {"to_honorific", "from_honorific"}
+    optional_columns = {
+        "to_address2", "to_address3", "to_phone", "to_honorific",
+        "from_address2", "from_address3", "from_phone", "from_honorific"
+    }
     all_columns = required_columns | optional_columns
 
     if reader.fieldnames is None:
@@ -628,23 +660,29 @@ def parse_csv_string(csv_content):
     for row_number, row in enumerate(reader, start=2):
         try:
             to_postal = row.get("to_postal", "").strip()
-            to_address = row.get("to_address", "").strip()
+            to_address1 = row.get("to_address1", "").strip()
+            to_address2 = row.get("to_address2", "").strip() or None
+            to_address3 = row.get("to_address3", "").strip() or None
             to_name = row.get("to_name", "").strip()
-            to_phone = row.get("to_phone", "").strip()
+            to_phone = row.get("to_phone", "").strip() or None
             to_honorific = row.get("to_honorific", "").strip()
             if not to_honorific:
                 to_honorific = "様"
 
             from_postal = row.get("from_postal", "").strip()
-            from_address = row.get("from_address", "").strip()
+            from_address1 = row.get("from_address1", "").strip()
+            from_address2 = row.get("from_address2", "").strip() or None
+            from_address3 = row.get("from_address3", "").strip() or None
             from_name = row.get("from_name", "").strip()
-            from_phone = row.get("from_phone", "").strip()
+            from_phone = row.get("from_phone", "").strip() or None
             from_honorific = row.get("from_honorific", "").strip()
 
             try:
                 to_info = AddressInfo(
                     postal_code=to_postal,
-                    address=to_address,
+                    address1=to_address1,
+                    address2=to_address2,
+                    address3=to_address3,
                     name=to_name,
                     phone=to_phone,
                     honorific=to_honorific
@@ -656,7 +694,9 @@ def parse_csv_string(csv_content):
             try:
                 from_info = AddressInfo(
                     postal_code=from_postal,
-                    address=from_address,
+                    address1=from_address1,
+                    address2=from_address2,
+                    address3=from_address3,
                     name=from_name,
                     phone=from_phone,
                     honorific=from_honorific
@@ -767,15 +807,19 @@ def parse_csv_string(csv_content):
                 const formData = new FormData(event.target);
                 const data = {
                     to_postal: formData.get('to_postal').trim(),
-                    to_address: formData.get('to_address').trim(),
+                    to_address1: formData.get('to_address1').trim(),
+                    to_address2: formData.get('to_address2').trim() || null,
+                    to_address3: formData.get('to_address3').trim() || null,
                     to_name: formData.get('to_name').trim(),
                     to_honorific: formData.get('to_honorific').trim() || '様',
-                    to_phone: formData.get('to_phone').trim(),
+                    to_phone: formData.get('to_phone').trim() || null,
                     from_postal: formData.get('from_postal').trim(),
-                    from_address: formData.get('from_address').trim(),
+                    from_address1: formData.get('from_address1').trim(),
+                    from_address2: formData.get('from_address2').trim() || null,
+                    from_address3: formData.get('from_address3').trim() || null,
                     from_name: formData.get('from_name').trim(),
                     from_honorific: formData.get('from_honorific').trim(),
-                    from_phone: formData.get('from_phone').trim(),
+                    from_phone: formData.get('from_phone').trim() || null,
                     layout_mode: formData.get('layout_mode')
                 };
 
@@ -790,17 +834,21 @@ form_data = json.loads(form_data_json)
 
 to_info = AddressInfo(
     postal_code=form_data['to_postal'],
-    address=form_data['to_address'],
+    address1=form_data['to_address1'],
+    address2=form_data.get('to_address2'),
+    address3=form_data.get('to_address3'),
     name=form_data['to_name'],
-    phone=form_data['to_phone'],
+    phone=form_data.get('to_phone'),
     honorific=form_data['to_honorific'] if form_data['to_honorific'] else None
 )
 
 from_info = AddressInfo(
     postal_code=form_data['from_postal'],
-    address=form_data['from_address'],
+    address1=form_data['from_address1'],
+    address2=form_data.get('from_address2'),
+    address3=form_data.get('from_address3'),
     name=form_data['from_name'],
-    phone=form_data['from_phone'],
+    phone=form_data.get('from_phone'),
     honorific=form_data['from_honorific'] if form_data['from_honorific'] else None
 )
 
@@ -959,12 +1007,16 @@ pdf_bytes
             // サンプルCSVデータ
             const headers = [
                 'to_postal',
-                'to_address',
+                'to_address1',
+                'to_address2',
+                'to_address3',
                 'to_name',
                 'to_phone',
                 'to_honorific',
                 'from_postal',
-                'from_address',
+                'from_address1',
+                'from_address2',
+                'from_address3',
                 'from_name',
                 'from_phone',
                 'from_honorific'
@@ -973,12 +1025,16 @@ pdf_bytes
             const sampleRows = [
                 [
                     '123-4567',
-                    '東京都渋谷区XXX 1-2-3 XXXビル4F',
+                    '東京都渋谷区XXX 1-2-3',
+                    'XXXビル4F',
+                    '',
                     '山田 太郎',
                     '03-1234-5678',
                     '',
                     '987-6543',
                     '大阪府大阪市YYY 4-5-6',
+                    '',
+                    '',
                     '田中 花子',
                     '06-9876-5432',
                     ''
@@ -986,11 +1042,15 @@ pdf_bytes
                 [
                     '111-2222',
                     '京都府京都市ZZZ 7-8-9',
+                    '',
+                    '',
                     '佐藤 次郎',
                     '075-111-2222',
                     '様',
                     '555-6666',
                     '福岡県福岡市AAA 10-11-12',
+                    '',
+                    '',
                     '鈴木 美咲',
                     '092-555-6666',
                     '一郎'

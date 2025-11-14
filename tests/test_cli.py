@@ -25,12 +25,16 @@ def test_cli_sample_option():
     # ヘッダーの確認
     expected_headers = [
         "to_postal",
-        "to_address",
+        "to_address1",
+        "to_address2",
+        "to_address3",
         "to_name",
         "to_phone",
         "to_honorific",
         "from_postal",
-        "from_address",
+        "from_address1",
+        "from_address2",
+        "from_address3",
         "from_name",
         "from_phone",
         "from_honorific",

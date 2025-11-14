@@ -173,7 +173,8 @@ def test_load_default_config():
     assert config is not None
     assert config.layout.label_width == 105
     assert config.layout.label_height == 122  # 実測値に基づく変更
-    assert config.layout.margin == 5  # 実測値に基づく変更
+    assert config.layout.margin_top == 2  # 上部マージン
+    assert config.layout.margin_left == 5  # 左右マージン
     assert config.fonts.label == 9
     assert config.fonts.postal_code == 13
     assert config.fonts.address == 11
@@ -194,7 +195,7 @@ def test_load_custom_config():
     # 一時的な設定ファイルを作成
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_file:
         config_data = {
-            "layout": {"label_width": 150, "label_height": 220, "margin": 10},
+            "layout": {"label_width": 150, "label_height": 220, "margin_top": 3, "margin_left": 10},
             "fonts": {"label": 10, "postal_code": 12, "address": 12, "name": 16, "phone": 12},
         }
         yaml.dump(config_data, tmp_file)
@@ -204,7 +205,8 @@ def test_load_custom_config():
         config = load_layout_config(config_path)
         assert config.layout.label_width == 150
         assert config.layout.label_height == 220
-        assert config.layout.margin == 10
+        assert config.layout.margin_top == 3
+        assert config.layout.margin_left == 10
         assert config.fonts.label == 10
         assert config.fonts.postal_code == 12
     finally:
@@ -296,7 +298,7 @@ def test_label_generator_with_custom_config():
     # カスタム設定を作成
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_config:
         config_data = {
-            "layout": {"margin": 12},
+            "layout": {"margin_top": 3, "margin_left": 12},
             "fonts": {"name": 16},
         }
         yaml.dump(config_data, tmp_config)
@@ -304,7 +306,8 @@ def test_label_generator_with_custom_config():
 
     try:
         generator = LabelGenerator(config_path=config_path)
-        assert generator.config.layout.margin == 12
+        assert generator.config.layout.margin_top == 3
+        assert generator.config.layout.margin_left == 12
         assert generator.config.fonts.name == 16
         # デフォルト値も正しく設定されているか確認
         assert generator.config.layout.label_width == 105

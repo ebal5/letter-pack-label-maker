@@ -52,7 +52,10 @@ class LayoutConfig(BaseModel):
         le=500,
         description="ラベルの高さ (mm)。実測値122mm（枠外側）に基づく。セクション高さの合計と一致させること",
     )
-    margin: float = Field(default=5, ge=0, le=50, description="セクション内のマージン (mm)")
+    margin_top: float = Field(default=2, ge=0, le=50, description="セクション内の上部マージン (mm)")
+    margin_left: float = Field(
+        default=5, ge=0, le=50, description="セクション内の左右マージン (mm)"
+    )
     draw_border: bool = Field(default=True, description="デバッグ用の枠線を描画するか")
     layout_mode: Literal["center", "grid_4up"] = Field(
         default="center", description="レイアウトモード: center=中央配置, grid_4up=4丁付"
@@ -535,8 +538,9 @@ class LabelGenerator:
             font_scale: フォントサイズのスケール（1.0=100%）
         """
         # 設定から値を取得し、スケールを適用
-        margin = self.config.layout.margin * mm
-        current_y = y + height - margin
+        margin_top = self.config.layout.margin_top * mm
+        margin_left = self.config.layout.margin_left * mm
+        current_y = y + height - margin_top
 
         label_font_size = int(self.config.fonts.label * font_scale)
         address_font_size = int(self.config.fonts.address * font_scale)
@@ -555,7 +559,7 @@ class LabelGenerator:
         c.setFont(self.font_name, label_font_size)
         c.setFillColorRGB(0, 0, 0)
         postal_y = current_y  # 〒記号の位置を記録
-        c.drawString(x + margin, postal_y, "〒")
+        c.drawString(x + margin_left, postal_y, "〒")
 
         # 郵便番号ボックス（〒記号と同じ高さに配置）
         postal_font_size_scaled = int(self.config.fonts.postal_code * font_scale)
@@ -564,7 +568,7 @@ class LabelGenerator:
         self._draw_postal_boxes(
             c,
             address.postal_code,
-            x + margin + postal_box_offset_x,
+            x + margin_left + postal_box_offset_x,
             postal_y + postal_box_offset_y,
             font_scale=font_scale,
         )
@@ -582,17 +586,17 @@ class LabelGenerator:
 
         # 入力された住所を表示
         for line in address_lines:
-            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+            self._draw_dotted_line(c, x + margin_left, current_y, x + width - margin_left)
             c.setFont(self.font_name, address_font_size)
             c.drawString(
-                x + margin + dotted_line_text_offset, current_y + dotted_line_text_offset, line
+                x + margin_left + dotted_line_text_offset, current_y + dotted_line_text_offset, line
             )
             current_y -= address_line_height
 
         # 残りの空欄の点線
         remaining_lines = self.config.address.max_lines - len(address_lines)
         for _ in range(remaining_lines):
-            self._draw_dotted_line(c, x + margin, current_y, x + width - margin)
+            self._draw_dotted_line(c, x + margin_left, current_y, x + width - margin_left)
             current_y -= address_line_height
 
         current_y -= address_name_gap
@@ -601,17 +605,19 @@ class LabelGenerator:
         honorific = address.honorific if address.honorific else ""
         if honorific:
             sama_width = self.config.sama.width * mm
-            name_line_end = x + width - margin - sama_width
+            name_line_end = x + width - margin_left - sama_width
         else:
-            name_line_end = x + width - margin
+            name_line_end = x + width - margin_left
 
-        self._draw_dotted_line(c, x + margin, current_y, name_line_end)
+        self._draw_dotted_line(c, x + margin_left, current_y, name_line_end)
 
         # 名前を描画
         c.setFont(self.font_name, name_font_size)
         c.setFillColorRGB(0, 0, 0)
         c.drawString(
-            x + margin + dotted_line_text_offset, current_y + dotted_line_text_offset, address.name
+            x + margin_left + dotted_line_text_offset,
+            current_y + dotted_line_text_offset,
+            address.name,
         )
 
         # 敬称を点線の右側に表示（敬称が指定されている場合のみ）
@@ -632,7 +638,7 @@ class LabelGenerator:
         if address.phone:
             c.setFont(self.font_name, label_font_size)
             c.setFillColorRGB(0, 0, 0)
-            c.drawString(x + margin, current_y, "Tel.")
+            c.drawString(x + margin_left, current_y, "Tel.")
 
             current_y -= section_spacing
 
@@ -640,7 +646,7 @@ class LabelGenerator:
             c.setFont(self.font_name, phone_font_size)
             c.setFillColorRGB(0, 0, 0)
             phone_text = f"( {address.phone} )"
-            c.drawString(x + margin + self.config.phone.offset_x, current_y, phone_text)
+            c.drawString(x + margin_left + self.config.phone.offset_x, current_y, phone_text)
 
     def _split_address(self, address: str, max_length: int = 30) -> list[str]:
         """

@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レイアウト調整ツール - レターパックラベル</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .preview-container {
+            position: sticky;
+            top: 20px;
+            height: calc(100vh - 40px);
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .preview-iframe {
+            width: 100%;
+            height: calc(100% - 60px);
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        .form-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .accordion-body input[type="number"],
+        .accordion-body input[type="text"],
+        .accordion-body select {
+            max-width: 200px;
+        }
+        .btn-toolbar {
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        h1 {
+            color: #0d6efd;
+            margin-bottom: 30px;
+        }
+        .accordion-button:not(.collapsed) {
+            background-color: #e7f1ff;
+            color: #0d6efd;
+        }
+        .form-label {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+        .input-group-text {
+            min-width: 60px;
+        }
+        .alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            min-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>レイアウト調整ツール</h1>
+
+    <div class="row">
+        <!-- 左側: パラメータ調整フォーム -->
+        <div class="col-lg-6">
+            <div class="form-container">
+                <form id="config-form">
+                    <div class="accordion" id="configAccordion">
+
+                        <!-- 1. Layout Settings -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#layoutCollapse">
+                                    1. Layout Settings (レイアウト設定)
+                                </button>
+                            </h2>
+                            <div id="layoutCollapse" class="accordion-collapse collapse show" data-bs-parent="#configAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Label Width (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="layout_label_width"
+                                                       value="{{ config.layout.label_width }}" min="0" max="300" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Label Height (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="layout_label_height"
+                                                       value="{{ config.layout.label_height }}" min="0" max="500" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Margin Top (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="layout_margin_top"
+                                                       value="{{ config.layout.margin_top }}" min="0" max="50" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Margin Left (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="layout_margin_left"
+                                                       value="{{ config.layout.margin_left }}" min="0" max="50" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Draw Border</label>
+                                            <select class="form-select" name="layout_draw_border">
+                                                <option value="true" {% if config.layout.draw_border %}selected{% endif %}>Yes</option>
+                                                <option value="false" {% if not config.layout.draw_border %}selected{% endif %}>No</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Layout Mode</label>
+                                            <select class="form-select" name="layout_layout_mode">
+                                                <option value="center" {% if config.layout.layout_mode == 'center' %}selected{% endif %}>Center</option>
+                                                <option value="grid_4up" {% if config.layout.layout_mode == 'grid_4up' %}selected{% endif %}>Grid 4up</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. Font Sizes -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#fontsCollapse">
+                                    2. Font Sizes (フォントサイズ)
+                                </button>
+                            </h2>
+                            <div id="fontsCollapse" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Label (pt)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="fonts_label"
+                                                       value="{{ config.fonts.label }}" min="1" max="72">
+                                                <span class="input-group-text">pt</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Postal Code (pt)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="fonts_postal_code"
+                                                       value="{{ config.fonts.postal_code }}" min="1" max="72">
+                                                <span class="input-group-text">pt</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Address (pt)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="fonts_address"
+                                                       value="{{ config.fonts.address }}" min="1" max="72">
+                                                <span class="input-group-text">pt</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Name (pt)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="fonts_name"
+                                                       value="{{ config.fonts.name }}" min="1" max="72">
+                                                <span class="input-group-text">pt</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Honorific (pt, optional)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="fonts_honorific"
+                                                       value="{{ config.fonts.honorific or '' }}" min="1" max="72">
+                                                <span class="input-group-text">pt</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Phone (pt)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="fonts_phone"
+                                                       value="{{ config.fonts.phone }}" min="1" max="72">
+                                                <span class="input-group-text">pt</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. Spacing -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#spacingCollapse">
+                                    3. Spacing (スペーシング)
+                                </button>
+                            </h2>
+                            <div id="spacingCollapse" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Section Spacing (px)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="spacing_section_spacing"
+                                                       value="{{ config.spacing.section_spacing }}" min="0" max="100">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Address Line Height (px)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="spacing_address_line_height"
+                                                       value="{{ config.spacing.address_line_height }}" min="0" max="100">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Address-Name Gap (px)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="spacing_address_name_gap"
+                                                       value="{{ config.spacing.address_name_gap }}" min="0" max="100">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Name-Phone Gap (px)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="spacing_name_phone_gap"
+                                                       value="{{ config.spacing.name_phone_gap }}" min="0" max="100">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Postal Box Offset X (px)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="spacing_postal_box_offset_x"
+                                                       value="{{ config.spacing.postal_box_offset_x }}" min="-100" max="100">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Postal Box Offset Y (px)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="spacing_postal_box_offset_y"
+                                                       value="{{ config.spacing.postal_box_offset_y }}" min="-100" max="100">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Dotted Line Text Offset (px)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="spacing_dotted_line_text_offset"
+                                                       value="{{ config.spacing.dotted_line_text_offset }}" min="0" max="50">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. Postal Box -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#postalBoxCollapse">
+                                    4. Postal Box (郵便番号ボックス)
+                                </button>
+                            </h2>
+                            <div id="postalBoxCollapse" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Box Size (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="postal_box_box_size"
+                                                       value="{{ config.postal_box.box_size }}" min="1" max="20" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Box Spacing (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="postal_box_box_spacing"
+                                                       value="{{ config.postal_box.box_spacing }}" min="0" max="10" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Line Width (pt)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="postal_box_line_width"
+                                                       value="{{ config.postal_box.line_width }}" min="0.1" max="5" step="0.1">
+                                                <span class="input-group-text">pt</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Text Vertical Offset (pt)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="postal_box_text_vertical_offset"
+                                                       value="{{ config.postal_box.text_vertical_offset }}" min="-10" max="10" step="0.1">
+                                                <span class="input-group-text">pt</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 5. Address Layout -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#addressCollapse">
+                                    5. Address Layout (住所レイアウト)
+                                </button>
+                            </h2>
+                            <div id="addressCollapse" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Max Length (characters)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="address_max_length"
+                                                       value="{{ config.address.max_length }}" min="1" max="100">
+                                                <span class="input-group-text">chars</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Max Lines</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="address_max_lines"
+                                                       value="{{ config.address.max_lines }}" min="1" max="10">
+                                                <span class="input-group-text">lines</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 6. Dotted Line -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#dottedLineCollapse">
+                                    6. Dotted Line (点線)
+                                </button>
+                            </h2>
+                            <div id="dottedLineCollapse" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Dash Length (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="dotted_line_dash_length"
+                                                       value="{{ config.dotted_line.dash_length }}" min="0.1" max="10" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Dash Spacing (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="dotted_line_dash_spacing"
+                                                       value="{{ config.dotted_line.dash_spacing }}" min="0.1" max="10" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Color R (0-1)</label>
+                                            <input type="number" class="form-control" name="dotted_line_color_r"
+                                                   value="{{ config.dotted_line.color_r }}" min="0" max="1" step="0.1">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Color G (0-1)</label>
+                                            <input type="number" class="form-control" name="dotted_line_color_g"
+                                                   value="{{ config.dotted_line.color_g }}" min="0" max="1" step="0.1">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Color B (0-1)</label>
+                                            <input type="number" class="form-control" name="dotted_line_color_b"
+                                                   value="{{ config.dotted_line.color_b }}" min="0" max="1" step="0.1">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 7. Sama -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#samaCollapse">
+                                    7. Sama (「様」設定)
+                                </button>
+                            </h2>
+                            <div id="samaCollapse" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Width (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="sama_width"
+                                                       value="{{ config.sama.width }}" min="1" max="50" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Offset (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="sama_offset"
+                                                       value="{{ config.sama.offset }}" min="0" max="20" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 8. Border -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#borderCollapse">
+                                    8. Border (枠線)
+                                </button>
+                            </h2>
+                            <div id="borderCollapse" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">Color R (0-1)</label>
+                                            <input type="number" class="form-control" name="border_color_r"
+                                                   value="{{ config.border.color_r }}" min="0" max="1" step="0.1">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Color G (0-1)</label>
+                                            <input type="number" class="form-control" name="border_color_g"
+                                                   value="{{ config.border.color_g }}" min="0" max="1" step="0.1">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">Color B (0-1)</label>
+                                            <input type="number" class="form-control" name="border_color_b"
+                                                   value="{{ config.border.color_b }}" min="0" max="1" step="0.1">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Line Width (pt)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="border_line_width"
+                                                       value="{{ config.border.line_width }}" min="0.1" max="10" step="0.1">
+                                                <span class="input-group-text">pt</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 9. Phone -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#phoneCollapse">
+                                    9. Phone (電話番号)
+                                </button>
+                            </h2>
+                            <div id="phoneCollapse" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Offset X (px)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="phone_offset_x"
+                                                       value="{{ config.phone.offset_x }}" min="0" max="200">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 10. Section Heights -->
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sectionHeightCollapse">
+                                    10. Section Heights (セクション高さ)
+                                </button>
+                            </h2>
+                            <div id="sectionHeightCollapse" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                                <div class="accordion-body">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">To Section Height (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="section_height_to_section_height"
+                                                       value="{{ config.section_height.to_section_height }}" min="1" max="200" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">From Section Height (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="section_height_from_section_height"
+                                                       value="{{ config.section_height.from_section_height }}" min="1" max="200" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Divider Line Width (mm)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="section_height_divider_line_width"
+                                                       value="{{ config.section_height.divider_line_width }}" min="0.1" max="10" step="0.1">
+                                                <span class="input-group-text">mm</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">From Section Font Scale</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="section_height_from_section_font_scale"
+                                                       value="{{ config.section_height.from_section_font_scale }}" min="0.1" max="2" step="0.1">
+                                                <span class="input-group-text">scale</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">From Address Max Lines</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="section_height_from_address_max_lines"
+                                                       value="{{ config.section_height.from_address_max_lines }}" min="1" max="10">
+                                                <span class="input-group-text">lines</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">From Address-Name Gap (px)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="section_height_from_address_name_gap"
+                                                       value="{{ config.section_height.from_address_name_gap }}" min="0" max="100">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">From Name-Phone Gap (px)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="section_height_from_name_phone_gap"
+                                                       value="{{ config.section_height.from_name_phone_gap }}" min="0" max="100">
+                                                <span class="input-group-text">px</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">From Address Font Size Adjust (pt)</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" name="section_height_from_address_font_size_adjust"
+                                                       value="{{ config.section_height.from_address_font_size_adjust }}" min="-10" max="10">
+                                                <span class="input-group-text">pt</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="mt-4 d-flex btn-toolbar justify-content-center">
+                        <button type="button" class="btn btn-primary btn-lg" onclick="updatePreview()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-eye" viewBox="0 0 16 16">
+                                <path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8M1.173 8a13 13 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5s3.879 1.168 5.168 2.457A13 13 0 0 1 14.828 8q-.086.13-.195.288c-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5s-3.879-1.168-5.168-2.457A13 13 0 0 1 1.172 8z"/>
+                                <path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0"/>
+                            </svg>
+                            プレビュー更新
+                        </button>
+                        <button type="button" class="btn btn-success btn-lg" onclick="saveConfig()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-save" viewBox="0 0 16 16">
+                                <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H9.5a1 1 0 0 0-1 1v7.293l2.646-2.647a.5.5 0 0 1 .708.708l-3.5 3.5a.5.5 0 0 1-.708 0l-3.5-3.5a.5.5 0 1 1 .708-.708L7.5 9.293V2a2 2 0 0 1 2-2H14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2h2.5a.5.5 0 0 1 0 1z"/>
+                            </svg>
+                            設定を保存
+                        </button>
+                        <button type="button" class="btn btn-secondary btn-lg" onclick="resetConfig()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-counterclockwise" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2z"/>
+                                <path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.308a.25.25 0 0 0 0 .384l2.36 1.966A.25.25 0 0 0 8 4.466"/>
+                            </svg>
+                            デフォルトに戻す
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 右側: PDFプレビュー -->
+        <div class="col-lg-6">
+            <div class="preview-container">
+                <h3 class="mb-3">プレビュー</h3>
+                <div id="loading-indicator" class="text-center mb-3" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">PDF生成中...</p>
+                </div>
+                <iframe id="preview-iframe" class="preview-iframe"></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function showAlert(message, type = 'success') {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.body.appendChild(alertDiv);
+
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        function showLoading(show) {
+            const loadingIndicator = document.getElementById('loading-indicator');
+            loadingIndicator.style.display = show ? 'block' : 'none';
+        }
+
+        function updatePreview() {
+            const form = document.getElementById('config-form');
+            const formData = new FormData(form);
+
+            showLoading(true);
+
+            fetch('/preview', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('PDF生成に失敗しました');
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                document.getElementById('preview-iframe').src = url;
+                showAlert('プレビューを更新しました', 'success');
+            })
+            .catch(error => {
+                showAlert('エラー: ' + error.message, 'danger');
+            })
+            .finally(() => {
+                showLoading(false);
+            });
+        }
+
+        function saveConfig() {
+            const form = document.getElementById('config-form');
+            const formData = new FormData(form);
+
+            fetch('/save', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showAlert(`設定を保存しました: ${data.path}`, 'success');
+                } else {
+                    showAlert('設定の保存に失敗しました', 'danger');
+                }
+            })
+            .catch(error => {
+                showAlert('エラー: ' + error.message, 'danger');
+            });
+        }
+
+        function resetConfig() {
+            fetch('/reset')
+            .then(response => response.json())
+            .then(config => {
+                // フォームをデフォルト値で埋める
+                const form = document.getElementById('config-form');
+
+                // Layout
+                form.layout_label_width.value = config.layout.label_width;
+                form.layout_label_height.value = config.layout.label_height;
+                form.layout_margin_top.value = config.layout.margin_top;
+                form.layout_margin_left.value = config.layout.margin_left;
+                form.layout_draw_border.value = config.layout.draw_border ? 'true' : 'false';
+                form.layout_layout_mode.value = config.layout.layout_mode;
+
+                // Fonts
+                form.fonts_label.value = config.fonts.label;
+                form.fonts_postal_code.value = config.fonts.postal_code;
+                form.fonts_address.value = config.fonts.address;
+                form.fonts_name.value = config.fonts.name;
+                form.fonts_honorific.value = config.fonts.honorific || '';
+                form.fonts_phone.value = config.fonts.phone;
+
+                // Spacing
+                form.spacing_section_spacing.value = config.spacing.section_spacing;
+                form.spacing_address_line_height.value = config.spacing.address_line_height;
+                form.spacing_address_name_gap.value = config.spacing.address_name_gap;
+                form.spacing_name_phone_gap.value = config.spacing.name_phone_gap;
+                form.spacing_postal_box_offset_x.value = config.spacing.postal_box_offset_x;
+                form.spacing_postal_box_offset_y.value = config.spacing.postal_box_offset_y;
+                form.spacing_dotted_line_text_offset.value = config.spacing.dotted_line_text_offset;
+
+                // Postal Box
+                form.postal_box_box_size.value = config.postal_box.box_size;
+                form.postal_box_box_spacing.value = config.postal_box.box_spacing;
+                form.postal_box_line_width.value = config.postal_box.line_width;
+                form.postal_box_text_vertical_offset.value = config.postal_box.text_vertical_offset;
+
+                // Address
+                form.address_max_length.value = config.address.max_length;
+                form.address_max_lines.value = config.address.max_lines;
+
+                // Dotted Line
+                form.dotted_line_dash_length.value = config.dotted_line.dash_length;
+                form.dotted_line_dash_spacing.value = config.dotted_line.dash_spacing;
+                form.dotted_line_color_r.value = config.dotted_line.color_r;
+                form.dotted_line_color_g.value = config.dotted_line.color_g;
+                form.dotted_line_color_b.value = config.dotted_line.color_b;
+
+                // Sama
+                form.sama_width.value = config.sama.width;
+                form.sama_offset.value = config.sama.offset;
+
+                // Border
+                form.border_color_r.value = config.border.color_r;
+                form.border_color_g.value = config.border.color_g;
+                form.border_color_b.value = config.border.color_b;
+                form.border_line_width.value = config.border.line_width;
+
+                // Phone
+                form.phone_offset_x.value = config.phone.offset_x;
+
+                // Section Height
+                form.section_height_to_section_height.value = config.section_height.to_section_height;
+                form.section_height_from_section_height.value = config.section_height.from_section_height;
+                form.section_height_divider_line_width.value = config.section_height.divider_line_width;
+                form.section_height_from_section_font_scale.value = config.section_height.from_section_font_scale;
+                form.section_height_from_address_max_lines.value = config.section_height.from_address_max_lines;
+                form.section_height_from_address_name_gap.value = config.section_height.from_address_name_gap;
+                form.section_height_from_name_phone_gap.value = config.section_height.from_name_phone_gap;
+                form.section_height_from_address_font_size_adjust.value = config.section_height.from_address_font_size_adjust;
+
+                showAlert('デフォルト設定に戻しました', 'info');
+                updatePreview();
+            })
+            .catch(error => {
+                showAlert('エラー: ' + error.message, 'danger');
+            });
+        }
+
+        // ページロード時にプレビュー更新
+        window.onload = function() {
+            updatePreview();
+        };
+    </script>
+</body>
+</html>

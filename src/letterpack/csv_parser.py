@@ -3,10 +3,13 @@ CSVファイルからレターパック情報を読み込むモジュール
 """
 
 import csv
+import logging
 from pathlib import Path
 from typing import NamedTuple
 
 from .label import AddressInfo
+
+logger = logging.getLogger(__name__)
 
 
 class LabelData(NamedTuple):
@@ -57,7 +60,7 @@ def _parse_csv_reader(
     # 不明なカラムの警告（エラーにはしない）
     unknown_columns = set(reader.fieldnames) - all_columns
     if unknown_columns:
-        print(f"警告: 不明なカラムがあります（無視されます）: {', '.join(unknown_columns)}")
+        logger.warning(f"不明なカラムがあります（無視されます）: {', '.join(unknown_columns)}")
 
     # 各行を処理
     for row_number, row in enumerate(reader, start=2):  # ヘッダーが1行目なので2から開始

@@ -179,75 +179,87 @@ class GitHubPagesVerifier(DeploymentVerifier):
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch()
-                page = await browser.new_page()
-
-                # ページアクセス
-                self._log(f"Accessing {url}")
-                start_time = time.time()
-
                 try:
-                    response = await page.goto(url, wait_until="domcontentloaded")
-                    page_load_time = (time.time() - start_time) * 1000
+                    page = await browser.new_page()
 
-                    result.status_code = response.status if response else None
-                    result.accessible = response and response.ok
-                    result.page_load_time_ms = page_load_time
+                    # ページアクセス
+                    self._log(f"Accessing {url}")
+                    start_time = time.time()
 
-                    if result.accessible:
-                        self._log(
-                            f"✅ Page accessible (HTTP {result.status_code}, {page_load_time:.0f}ms)"
-                        )
-                    else:
-                        self._log(
-                            f"❌ Page not accessible (HTTP {result.status_code})",
-                            "ERROR",
-                        )
-                        result.errors.append(f"HTTP {result.status_code}")
+                    try:
+                        response = await page.goto(url, wait_until="domcontentloaded")
+                        page_load_time = (time.time() - start_time) * 1000
 
-                except Exception as e:
-                    self._log(f"❌ Failed to access page: {e}", "ERROR")
-                    result.errors.append(f"Page access failed: {e}")
-                    await browser.close()
-                    result.message = "Verification failed: Page access error"
-                    return result
+                        result.status_code = response.status if response else None
+                        result.accessible = response and response.ok
+                        result.page_load_time_ms = page_load_time
 
-                # 必須要素のチェック
-                critical_elements = config.get("critical_elements", [])
-                if critical_elements:
-                    self._log("Checking critical elements")
-                    await self._check_critical_elements(page, critical_elements, result)
-
-                # リンクチェック
-                if check_links:
-                    self._log("Checking links")
-                    link_results = await self._check_links(page, url, config)
-                    result.link_check_results = link_results
-
-                    # リンクチェック結果のサマリー
-                    broken_internal = [
-                        lr for lr in link_results if not lr.ok and not lr.is_external
-                    ]
-                    broken_external = [lr for lr in link_results if not lr.ok and lr.is_external]
-
-                    if broken_internal:
-                        result.errors.append(f"Found {len(broken_internal)} broken internal links")
-                    if broken_external:
-                        if config.get("link_check", {}).get("external_as_warning", True):
-                            result.warnings.append(
-                                f"Found {len(broken_external)} broken external links"
+                        if result.accessible:
+                            self._log(
+                                f"✅ Page accessible (HTTP {result.status_code}, {page_load_time:.0f}ms)"
                             )
                         else:
-                            result.errors.append(
-                                f"Found {len(broken_external)} broken external links"
+                            self._log(
+                                f"❌ Page not accessible (HTTP {result.status_code})",
+                                "ERROR",
                             )
+                            result.errors.append(f"HTTP {result.status_code}")
 
-                    self._log(
-                        f"Link check: {len([lr for lr in link_results if lr.ok])} OK, "
-                        f"{len(broken_internal)} broken internal, "
-                        f"{len(broken_external)} broken external"
-                    )
+                    except asyncio.TimeoutError:
+                        elapsed = (time.time() - start_time) * 1000
+                        self._log(f"❌ Page load timeout after {elapsed:.1f}ms", "ERROR")
+                        result.errors.append(f"Page load timeout after {elapsed:.1f}ms")
+                        result.message = "Verification failed: Page load timeout"
+                        return result
+                    except Exception as e:
+                        self._log(f"❌ Failed to access page: {e}", "ERROR")
+                        result.errors.append(f"Page access failed: {e}")
+                        result.message = "Verification failed: Page access error"
+                        return result
 
-                await browser.close()
+                    # 必須要素のチェック
+                    critical_elements = config.get("critical_elements", [])
+                    if critical_elements:
+                        self._log("Checking critical elements")
+                        await self._check_critical_elements(page, critical_elements, result)
+
+                    # リンクチェック
+                    if check_links:
+                        self._log("Checking links")
+                        link_results = await self._check_links(page, url, config)
+                        result.link_check_results = link_results
+
+                        # リンクチェック結果のサマリー
+                        broken_internal = [
+                            lr for lr in link_results if not lr.ok and not lr.is_external
+                        ]
+                        broken_external = [
+                            lr for lr in link_results if not lr.ok and lr.is_external
+                        ]
+
+                        if broken_internal:
+                            result.errors.append(
+                                f"Found {len(broken_internal)} broken internal links"
+                            )
+                        if broken_external:
+                            if config.get("link_check", {}).get("external_as_warning", True):
+                                result.warnings.append(
+                                    f"Found {len(broken_external)} broken external links"
+                                )
+                            else:
+                                result.errors.append(
+                                    f"Found {len(broken_external)} broken external links"
+                                )
+
+                        self._log(
+                            f"Link check: {len([lr for lr in link_results if lr.ok])} OK, "
+                            f"{len(broken_internal)} broken internal, "
+                            f"{len(broken_external)} broken external"
+                        )
+
+                finally:
+                    # ブラウザを確実にクローズ（メモリリーク対策）
+                    await browser.close()
 
         except Exception as e:
             self._log(f"❌ Verification failed: {e}", "ERROR")

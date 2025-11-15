@@ -116,71 +116,83 @@ class PerformanceMonitor:
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch()
-                page = await browser.new_page()
-
-                # ページロード時間を計測
-                start_time = time.time()
-                await page.goto(url, wait_until="domcontentloaded")
-                load_time = (time.time() - start_time) * 1000
-                metrics.page_load_ms = load_time
-
-                self._log(f"Page load time: {load_time:.0f}ms")
-
-                # Playwrightのパフォーマンスメトリクスを取得
                 try:
-                    perf_data = await page.evaluate(
+                    page = await browser.new_page()
+
+                    # ページロード時間を計測
+                    start_time = time.time()
+                    try:
+                        await page.goto(url, wait_until="domcontentloaded")
+                        load_time = (time.time() - start_time) * 1000
+                        metrics.page_load_ms = load_time
+                        self._log(f"Page load time: {load_time:.0f}ms")
+                    except asyncio.TimeoutError:
+                        elapsed = (time.time() - start_time) * 1000
+                        self._log(f"Page load timeout after {elapsed:.1f}ms", "ERROR")
+                        return metrics
+
+                    # Playwrightのパフォーマンスメトリクスを取得
+                    try:
+                        perf_data = await page.evaluate(
+                            """
+                            () => {
+                                const perfData = performance.getEntriesByType('navigation')[0];
+                                const paintData = performance.getEntriesByType('paint');
+
+                                const fcp = paintData.find(p => p.name === 'first-contentful-paint');
+                                const lcp = paintData.find(p => p.name === 'largest-contentful-paint');
+
+                                return {
+                                    domContentLoaded: perfData ? perfData.domContentLoadedEventEnd - perfData.fetchStart : null,
+                                    fcp: fcp ? fcp.startTime : null,
+                                    lcp: lcp ? lcp.startTime : null,
+                                };
+                            }
                         """
-                        () => {
-                            const perfData = performance.getEntriesByType('navigation')[0];
-                            const paintData = performance.getEntriesByType('paint');
+                        )
 
-                            const fcp = paintData.find(p => p.name === 'first-contentful-paint');
-                            const lcp = paintData.find(p => p.name === 'largest-contentful-paint');
+                        if perf_data.get("fcp"):
+                            metrics.first_contentful_paint_ms = perf_data["fcp"]
+                            self._log(f"First Contentful Paint: {perf_data['fcp']:.0f}ms")
 
-                            return {
-                                domContentLoaded: perfData ? perfData.domContentLoadedEventEnd - perfData.fetchStart : null,
-                                fcp: fcp ? fcp.startTime : null,
-                                lcp: lcp ? lcp.startTime : null,
-                            };
-                        }
-                    """
-                    )
+                        if perf_data.get("lcp"):
+                            metrics.largest_contentful_paint_ms = perf_data["lcp"]
+                            self._log(f"Largest Contentful Paint: {perf_data['lcp']:.0f}ms")
 
-                    if perf_data.get("fcp"):
-                        metrics.first_contentful_paint_ms = perf_data["fcp"]
-                        self._log(f"First Contentful Paint: {perf_data['fcp']:.0f}ms")
+                    except Exception as e:
+                        self._log(f"Could not get performance metrics: {e}", "WARNING")
 
-                    if perf_data.get("lcp"):
-                        metrics.largest_contentful_paint_ms = perf_data["lcp"]
-                        self._log(f"Largest Contentful Paint: {perf_data['lcp']:.0f}ms")
+                    # Pyodide初期化時間を計測
+                    self._log("Waiting for Pyodide initialization...")
+                    pyodide_start = time.time()
+                    try:
+                        # config.yamlからタイムアウト値を読み込む
+                        config = self.config.get("github_pages", {})
+                        thresholds = config.get("performance_thresholds", {})
+                        timeout_ms = int(thresholds.get("pyodide_init_ms", 90000))
 
-                except Exception as e:
-                    self._log(f"Could not get performance metrics: {e}", "WARNING")
+                        await page.wait_for_selector("#label-form", timeout=timeout_ms)
+                        pyodide_time = (time.time() - pyodide_start) * 1000
+                        metrics.pyodide_init_ms = pyodide_time
+                        self._log(f"Pyodide initialization: {pyodide_time:.0f}ms")
+                    except asyncio.TimeoutError:
+                        elapsed = (time.time() - pyodide_start) * 1000
+                        self._log(
+                            f"Pyodide initialization timeout after {elapsed:.1f}ms "
+                            f"(expected: {timeout_ms}ms)",
+                            "WARNING",
+                        )
+                    except Exception as e:
+                        self._log(f"Pyodide initialization failed: {e}", "WARNING")
 
-                # Pyodide初期化時間を計測
-                self._log("Waiting for Pyodide initialization...")
-                pyodide_start = time.time()
-                try:
-                    # config.yamlからタイムアウト値を読み込む
-                    config = self.config.get("github_pages", {})
-                    thresholds = config.get("performance_thresholds", {})
-                    timeout_ms = int(thresholds.get("pyodide_init_ms", 90000))
+                    # メモリ使用量
+                    if psutil is not None:
+                        metrics.memory_mb = psutil.Process().memory_info().rss / (1024 * 1024)
+                        self._log(f"Memory usage: {metrics.memory_mb:.2f}MB")
 
-                    await page.wait_for_selector("#label-form", timeout=timeout_ms)
-                    pyodide_time = (time.time() - pyodide_start) * 1000
-                    metrics.pyodide_init_ms = pyodide_time
-                    self._log(f"Pyodide initialization: {pyodide_time:.0f}ms")
-                except asyncio.TimeoutError:
-                    self._log(f"Pyodide initialization timeout after {timeout_ms}ms", "WARNING")
-                except Exception as e:
-                    self._log(f"Pyodide initialization failed: {e}", "WARNING")
-
-                # メモリ使用量
-                if psutil is not None:
-                    metrics.memory_mb = psutil.Process().memory_info().rss / (1024 * 1024)
-                    self._log(f"Memory usage: {metrics.memory_mb:.2f}MB")
-
-                await browser.close()
+                finally:
+                    # ブラウザを確実にクローズ（メモリリーク対策）
+                    await browser.close()
 
         except Exception as e:
             self._log(f"Performance measurement failed: {e}", "ERROR")

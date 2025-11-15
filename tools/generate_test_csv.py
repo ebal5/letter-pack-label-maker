@@ -10,7 +10,7 @@ import csv
 import random
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 # 都道府県リスト（47都道府県）
 PREFECTURES = [
@@ -146,7 +146,7 @@ def generate_postal_code() -> str:
     return f"{random.randint(0, 999):03d}-{random.randint(0, 9999):04d}"
 
 
-def generate_address() -> Dict[str, str]:
+def generate_address() -> dict[str, str]:
     """住所データを生成"""
     prefecture = random.choice(PREFECTURES)
     city = random.choice(CITIES)
@@ -155,9 +155,7 @@ def generate_address() -> Dict[str, str]:
     # 建物名を生成（50%の確率で生成）
     building = ""
     if random.random() < 0.5:
-        building = (
-            f"{random.choice(BUILDING_PREFIXES)}ビル{random.randint(1, 10)}F"
-        )
+        building = f"{random.choice(BUILDING_PREFIXES)}ビル{random.randint(1, 10)}F"
 
     return {
         "postal_code": generate_postal_code(),
@@ -172,34 +170,36 @@ def generate_name() -> str:
     return f"{random.choice(LAST_NAMES)}{random.choice(FIRST_NAMES)}"
 
 
-def generate_standard_data(count: int = 10) -> List[Dict[str, Any]]:
+def generate_standard_data(count: int = 10) -> list[dict[str, Any]]:
     """標準的なテストデータを生成"""
     data = []
     for _ in range(count):
         to_addr = generate_address()
         from_addr = generate_address()
 
-        data.append({
-            "to_postal": to_addr["postal_code"],
-            "to_address1": to_addr["address1"],
-            "to_address2": to_addr["address2"],
-            "to_address3": to_addr["address3"] or "",
-            "to_name": generate_name(),
-            "to_phone": "",
-            "to_honorific": random.choice(HONORIFICS),
-            "from_postal": from_addr["postal_code"],
-            "from_address1": from_addr["address1"],
-            "from_address2": from_addr["address2"],
-            "from_address3": from_addr["address3"] or "",
-            "from_name": generate_name(),
-            "from_phone": "",
-            "from_honorific": random.choice(["", "様"]),  # 差出人は敬称なしまたは「様」
-        })
+        data.append(
+            {
+                "to_postal": to_addr["postal_code"],
+                "to_address1": to_addr["address1"],
+                "to_address2": to_addr["address2"],
+                "to_address3": to_addr["address3"] or "",
+                "to_name": generate_name(),
+                "to_phone": "",
+                "to_honorific": random.choice(HONORIFICS),
+                "from_postal": from_addr["postal_code"],
+                "from_address1": from_addr["address1"],
+                "from_address2": from_addr["address2"],
+                "from_address3": from_addr["address3"] or "",
+                "from_name": generate_name(),
+                "from_phone": "",
+                "from_honorific": random.choice(["", "様"]),  # 差出人は敬称なしまたは「様」
+            }
+        )
 
     return data
 
 
-def generate_edge_case_data() -> List[Dict[str, Any]]:
+def generate_edge_case_data() -> list[dict[str, Any]]:
     """エッジケースのテストデータを生成"""
     edge_cases = [
         # 長い住所
@@ -291,12 +291,12 @@ def generate_edge_case_data() -> List[Dict[str, Any]]:
     return edge_cases
 
 
-def generate_stress_data(count: int = 1000) -> List[Dict[str, Any]]:
+def generate_stress_data(count: int = 1000) -> list[dict[str, Any]]:
     """ストレステスト用データを生成"""
     return generate_standard_data(count)
 
 
-def generate_invalid_data() -> List[Dict[str, Any]]:
+def generate_invalid_data() -> list[dict[str, Any]]:
     """不正なテストデータを生成（バリデーション検証用）"""
     invalid_cases = [
         # 郵便番号が空
@@ -371,7 +371,7 @@ def generate_invalid_data() -> List[Dict[str, Any]]:
     return invalid_cases
 
 
-def save_csv(data: List[Dict[str, Any]], filename: str) -> Path:
+def save_csv(data: list[dict[str, Any]], filename: str) -> Path:
     """CSVファイルに保存"""
     output_dir = Path("examples")
     output_dir.mkdir(exist_ok=True)
@@ -408,9 +408,9 @@ def calculate_pages(count: int) -> int:
     return (count + 3) // 4
 
 
-def count_honorifics(data: List[Dict[str, Any]], honorific_field: str) -> Dict[str, int]:
+def count_honorifics(data: list[dict[str, Any]], honorific_field: str) -> dict[str, int]:
     """敬称の分布を集計"""
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     for row in data:
         h = row[honorific_field] or "なし"
         counts[h] = counts.get(h, 0) + 1
@@ -493,9 +493,9 @@ def main() -> None:
     # 次のステップを提示
     print("【次のステップ】")
     print("以下のコマンドでラベルを生成できます：")
-    print(f"```bash")
+    print("```bash")
     print(f"uv run python -m letterpack.cli --csv {filepath} --output output/test_labels.pdf")
-    print(f"```")
+    print("```")
 
 
 if __name__ == "__main__":

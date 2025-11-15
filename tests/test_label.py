@@ -9,6 +9,7 @@ import tempfile
 
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from letterpack.label import AddressInfo, LabelGenerator, create_label, load_layout_config
 
@@ -196,6 +197,8 @@ def test_load_custom_config():
         config_data = {
             "layout": {"label_width": 150, "label_height": 220, "margin_top": 3, "margin_left": 10},
             "fonts": {"label": 10, "postal_code": 12, "address": 12, "name": 16, "phone": 12},
+            # セクション高さの合計がlabel_heightと一致するように設定
+            "section_height": {"to_section_height": 150, "from_section_height": 70},
         }
         yaml.dump(config_data, tmp_file)
         config_path = tmp_file.name
@@ -266,11 +269,13 @@ def test_label_generation_with_custom_config():
         phone="06-9876-5432",
     )
 
-    # カスタム設定を作成
+    # カスタム設定を作成（セクション高さの合計がlabel_heightと一致するように設定）
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_config:
         config_data = {
             "layout": {"label_width": 148, "label_height": 210, "margin": 10},
             "fonts": {"label": 10, "postal_code": 11, "address": 12, "name": 15, "phone": 12},
+            # セクション高さの合計が210mmになるように設定
+            "section_height": {"to_section_height": 140, "from_section_height": 70},
         }
         yaml.dump(config_data, tmp_config)
         config_path = tmp_config.name
@@ -545,3 +550,180 @@ def test_custom_honorific_font_size():
     finally:
         if os.path.exists(config_path):
             os.remove(config_path)
+
+
+def test_load_config_from_dict():
+    """辞書から設定をロードするテスト（静的HTML版用）"""
+    # 設定辞書を作成
+    config_dict = {
+        "fonts": {"name": 16, "honorific": 12, "address": 13},
+        "layout": {"label_width": 110, "label_height": 125},
+        # セクション高さの合計がlabel_heightと一致するように設定
+        "section_height": {"to_section_height": 75, "from_section_height": 50},
+    }
+
+    # 辞書から設定をロード
+    config = load_layout_config(config_dict=config_dict)
+    assert config.fonts.name == 16
+    assert config.fonts.honorific == 12
+    assert config.fonts.address == 13
+    assert config.layout.label_width == 110
+    assert config.layout.label_height == 125
+    # その他の値はデフォルト
+    assert config.fonts.postal_code == 13  # デフォルト値
+
+
+def test_load_config_from_empty_dict():
+    """空の辞書から設定をロードするテスト"""
+    config = load_layout_config(config_dict={})
+    # デフォルト設定が返されるべき
+    assert config.fonts.name == 14  # デフォルト値
+    assert config.layout.label_width == 105  # デフォルト値
+
+
+def test_label_generation_with_config_dict():
+    """辞書設定を使用したラベル生成のテスト"""
+    config_dict = {
+        "fonts": {"name": 18, "address": 14},
+        "layout": {"draw_border": True},
+    }
+
+    to_addr = AddressInfo(
+        postal_code="123-4567",
+        address1="東京都渋谷区XXX 1-2-3",
+        name="山田太郎",
+        phone="03-1234-5678",
+    )
+    from_addr = AddressInfo(
+        postal_code="987-6543",
+        address1="大阪府大阪市YYY 4-5-6",
+        name="田中花子",
+        phone="06-9876-5432",
+    )
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_pdf:
+        output_path = tmp_pdf.name
+
+    try:
+        result = create_label(to_addr, from_addr, output_path, config_dict=config_dict)
+        assert os.path.exists(result)
+        assert os.path.getsize(result) > 0
+
+        # CI環境用にPDFを保存
+        save_to_test_output(result)
+    finally:
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+
+def test_config_dict_priority_over_path():
+    """config_dictとconfig_pathが両方指定された場合、config_dictが優先されることをテスト"""
+    # ファイル設定を作成
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".yaml") as tmp_config:
+        file_config = {"fonts": {"name": 10}}
+        yaml.dump(file_config, tmp_config)
+        config_path = tmp_config.name
+
+    try:
+        # 辞書設定（こちらが優先されるべき）
+        dict_config = {"fonts": {"name": 20}}
+
+        config = load_layout_config(config_path=config_path, config_dict=dict_config)
+        # 辞書設定が優先される
+        assert config.fonts.name == 20
+    finally:
+        if os.path.exists(config_path):
+            os.remove(config_path)
+
+
+# レビュー指摘のテストケース
+
+
+def test_config_dict_with_partial_config():
+    """部分的な設定辞書でデフォルト値がマージされることを確認"""
+    partial_config = {
+        "fonts": {"name": 16},  # name のみ変更
+        "layout": {"draw_border": False},
+    }
+
+    config = load_layout_config(config_dict=partial_config)
+
+    # 指定した値が反映されている
+    assert config.fonts.name == 16
+    assert config.layout.draw_border is False
+
+    # その他はデフォルト値
+    assert config.fonts.label == 9
+    assert config.layout.label_width == 105
+
+
+def test_section_height_validation_success():
+    """セクション高さの合計がlabel_heightと一致する場合、検証成功"""
+    config_dict = {
+        "layout": {"label_height": 120},
+        "section_height": {"to_section_height": 70, "from_section_height": 50},
+    }
+
+    # 合計120mmで一致するため、エラーなし
+    config = load_layout_config(config_dict=config_dict)
+    assert config.layout.label_height == 120
+
+
+def test_section_height_validation_failure():
+    """セクション高さの合計がlabel_heightと一致しない場合、ValidationErrorが発生"""
+    config_dict = {
+        "layout": {"label_height": 120},
+        "section_height": {"to_section_height": 70, "from_section_height": 60},
+    }
+
+    # 合計130mmでlabel_height 120mmと一致しないため、ValidationError
+    with pytest.raises(ValueError, match="セクション高さの合計"):
+        load_layout_config(config_dict=config_dict)
+
+
+def test_config_dict_replaces_yaml_file(tmp_path):
+    """config_dictが指定された場合、config_pathのYAMLファイルは無視されることを確認"""
+    yaml_config = tmp_path / "test_config.yaml"
+    yaml_config.write_text(
+        """
+layout:
+  label_width: 100
+  label_height: 150
+fonts:
+  name: 12
+  address: 10
+"""
+    )
+
+    config_dict = {
+        "fonts": {"name": 18}  # nameのみ上書き
+    }
+
+    config = load_layout_config(config_path=str(yaml_config), config_dict=config_dict)
+
+    # config_dictで指定したものが反映
+    assert config.fonts.name == 18
+
+    # YAMLファイルは無視され、config_dictで指定されていないものはデフォルト値
+    assert config.layout.label_width == 105  # デフォルト値
+    assert config.fonts.address == 11  # デフォルト値
+
+
+def test_invalid_label_width_raises_error():
+    """不正なlabel_widthでValidationError"""
+    config_dict = {
+        "layout": {"label_width": -10}  # 負の値
+    }
+
+    with pytest.raises(ValidationError):
+        load_layout_config(config_dict=config_dict)
+
+
+def test_invalid_font_size_raises_error():
+    """不正なフォントサイズでValidationError"""
+    config_dict = {
+        "fonts": {"name": 100}  # 72ptを超える
+    }
+
+    with pytest.raises(ValidationError):
+        load_layout_config(config_dict=config_dict)

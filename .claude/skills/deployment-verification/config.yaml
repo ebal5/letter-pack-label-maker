@@ -25,8 +25,8 @@ github_pages:
     - selector: "#generate-btn"
       description: "PDF生成ボタン"
       timeout_ms: 90000
-    - selector: "button[onclick='generateLabel()']"
-      description: "ラベル生成実行ボタン"
+    - selector: "#generate-csv-btn"
+      description: "CSV一括生成ボタン"
       timeout_ms: 90000
 
   # パフォーマンスの閾値（ミリ秒）

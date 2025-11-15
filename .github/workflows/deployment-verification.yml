@@ -35,6 +35,11 @@ on:
   schedule:
     - cron: '0 9 * * *'
 
+# ワークフローの権限設定
+permissions:
+  contents: read
+  pull-requests: write  # PRコメントを投稿するために必要
+
 jobs:
   verify-github-pages:
     name: Verify GitHub Pages Deployment

@@ -9,7 +9,6 @@ import importlib.util
 import os
 import subprocess
 import time
-from typing import Optional
 
 import pytest
 
@@ -45,7 +44,7 @@ class PDFValidator:
     """PDFの基本情報を検証するクラス"""
 
     @staticmethod
-    def get_page_count(pdf_path: str) -> Optional[int]:
+    def get_page_count(pdf_path: str) -> int | None:
         """PDFのページ数を取得"""
         if not HAS_PYPDF2:
             return None
@@ -62,7 +61,7 @@ class PDFValidator:
         return os.path.getsize(pdf_path)
 
     @staticmethod
-    def extract_text(pdf_path: str) -> Optional[str]:
+    def extract_text(pdf_path: str) -> str | None:
         """PDFからテキスト内容を抽出"""
         if not HAS_PDFPLUMBER:
             return None
@@ -80,7 +79,7 @@ class PDFValidator:
 def test_csv_data(tmp_path):
     """テスト用CSVデータを準備"""
     csv_path = tmp_path / "test_multi_interface.csv"
-    csv_content = """to_postal,to_address,to_name,to_phone,to_honorific,from_postal,from_address,from_name,from_phone,from_honorific
+    csv_content = """to_postal,to_address1,to_name,to_phone,to_honorific,from_postal,from_address1,from_name,from_phone,from_honorific
 100-0001,東京都千代田区千代田1-1,山田太郎,03-1234-5678,様,150-0001,東京都渋谷区渋谷1-1,佐藤花子,03-9876-5432,
 200-0002,大阪府大阪市中央区2-2,鈴木次郎,06-1111-2222,殿,150-0001,東京都渋谷区渋谷1-1,佐藤花子,03-9876-5432,
 300-0003,京都府京都市中京区3-3,佐藤太郎,075-3333-4444,,150-0001,東京都渋谷区渋谷1-1,佐藤花子,03-9876-5432,
@@ -311,14 +310,14 @@ class TestPDFConsistency:
         """単一ラベルの生成一貫性テスト"""
         to_addr = AddressInfo(
             postal_code="100-0001",
-            address="東京都千代田区千代田1-1",
+            address1="東京都千代田区千代田1-1",
             name="テスト太郎",
             phone="03-1234-5678",
             honorific="様",
         )
         from_addr = AddressInfo(
             postal_code="150-0001",
-            address="東京都渋谷区渋谷1-1",
+            address1="東京都渋谷区渋谷1-1",
             name="テスト花子",
             phone="03-9876-5432",
         )

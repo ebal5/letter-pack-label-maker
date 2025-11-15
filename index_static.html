@@ -393,12 +393,12 @@ class LabelGenerator:
         c.rect(x_offset, y_offset, label_width, label_height)
 
         # セクション高さを個別設定（実測値ベース）
-        to_section_height = 69 * mm    # お届け先（実測値68mm）
-        from_section_height = 53 * mm  # ご依頼主（実測値52mm）
-        divider_line_width = 1 * mm    # 区切り線
+        to_section_height = 68 * mm    # お届け先（実測値）
+        from_section_height = 52 * mm  # ご依頼主（実測値）
 
+        # 区切り線（太さは2.5ポイント固定）
         c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(divider_line_width)
+        c.setLineWidth(2.5)
         # 区切り線の位置はご依頼主セクションの上端
         divider_y = y_offset + from_section_height
         c.line(x_offset, divider_y, x_offset + label_width, divider_y)

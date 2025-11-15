@@ -4,7 +4,7 @@ CSVファイルからレターパック情報を読み込むモジュール
 
 import csv
 from pathlib import Path
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 from .label import AddressInfo
 
@@ -229,7 +229,7 @@ def parse_csv(csv_path: str) -> list[LabelData]:
     return labels
 
 
-def validate_csv(csv_path: str) -> tuple[bool, Optional[str], int]:
+def validate_csv(csv_path: str) -> tuple[bool, str | None, int]:
     """
     CSVファイルを検証（PDF生成前のチェック用）
 

@@ -5,7 +5,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -24,10 +24,10 @@ class AddressInfo:
     postal_code: str  # 郵便番号（例: "123-4567"）
     address1: str  # 住所1行目（必須）
     name: str  # 氏名
-    address2: Optional[str] = None  # 住所2行目（任意）
-    address3: Optional[str] = None  # 住所3行目（任意）
-    phone: Optional[str] = None  # 電話番号
-    honorific: Optional[str] = None  # 敬称（Noneまたは空文字列で敬称なし）
+    address2: str | None = None  # 住所2行目（任意）
+    address3: str | None = None  # 住所3行目（任意）
+    phone: str | None = None  # 電話番号
+    honorific: str | None = None  # 敬称（Noneまたは空文字列で敬称なし）
 
     def __post_init__(self):
         """バリデーション"""
@@ -69,7 +69,7 @@ class FontsConfig(BaseModel):
     postal_code: int = Field(default=13, gt=0, le=72, description="郵便番号のフォントサイズ (pt)")
     address: int = Field(default=11, gt=0, le=72, description="住所のフォントサイズ (pt)")
     name: int = Field(default=14, gt=0, le=72, description="氏名のフォントサイズ (pt)")
-    honorific: Optional[int] = Field(
+    honorific: int | None = Field(
         default=None,
         gt=0,
         le=72,
@@ -154,13 +154,10 @@ class SectionHeightConfig(BaseModel):
     """セクション高さ設定（実測値ベース）"""
 
     to_section_height: float = Field(
-        default=69, gt=0, le=200, description="お届け先セクションの高さ (mm)。実測値68mm"
+        default=68, gt=0, le=200, description="お届け先セクションの高さ (mm)。実測値"
     )
     from_section_height: float = Field(
-        default=53, gt=0, le=200, description="ご依頼主セクションの高さ (mm)。実測値52mm"
-    )
-    divider_line_width: float = Field(
-        default=1, gt=0, le=10, description="区切り線の太さ (mm)。実測値1mm"
+        default=52, gt=0, le=200, description="ご依頼主セクションの高さ (mm)。実測値"
     )
     from_section_font_scale: float = Field(
         default=0.7,
@@ -197,7 +194,7 @@ class LabelLayoutConfig(BaseModel):
     section_height: SectionHeightConfig = Field(default_factory=SectionHeightConfig)
 
 
-def load_layout_config(config_path: Optional[str] = None) -> LabelLayoutConfig:
+def load_layout_config(config_path: str | None = None) -> LabelLayoutConfig:
     """
     レイアウト設定をYAMLファイルから読み込む
 
@@ -237,7 +234,7 @@ def load_layout_config(config_path: Optional[str] = None) -> LabelLayoutConfig:
 class LabelGenerator:
     """レターパックラベルPDF生成クラス"""
 
-    def __init__(self, font_path: Optional[str] = None, config_path: Optional[str] = None):
+    def __init__(self, font_path: str | None = None, config_path: str | None = None):
         """
         Args:
             font_path: 日本語フォントのパス（Noneの場合はシステムフォントを試行）
@@ -403,11 +400,10 @@ class LabelGenerator:
         # セクション高さを設定から取得（実測値ベース）
         to_section_height = self.config.section_height.to_section_height * mm
         from_section_height = self.config.section_height.from_section_height * mm
-        divider_line_width = self.config.section_height.divider_line_width * mm
 
-        # 区切り線
+        # 区切り線（太さは2.5ポイント固定）
         c.setStrokeColorRGB(0, 0, 0)  # 黒に戻す
-        c.setLineWidth(divider_line_width)
+        c.setLineWidth(2.5)
         # 区切り線の位置はご依頼主セクションの上端
         divider_y = y_offset + from_section_height
         c.line(x_offset, divider_y, x_offset + label_width, divider_y)
@@ -770,8 +766,8 @@ def create_label(
     to_address: AddressInfo,
     from_address: AddressInfo,
     output_path: str = "label.pdf",
-    font_path: Optional[str] = None,
-    config_path: Optional[str] = None,
+    font_path: str | None = None,
+    config_path: str | None = None,
 ) -> str:
     """
     ラベルPDFを生成する便利関数
@@ -793,8 +789,8 @@ def create_label(
 def create_label_batch(
     label_pairs: list[tuple[AddressInfo, AddressInfo]],
     output_path: str = "labels.pdf",
-    font_path: Optional[str] = None,
-    config_path: Optional[str] = None,
+    font_path: str | None = None,
+    config_path: str | None = None,
 ) -> str:
     """
     複数のラベルを4upレイアウトで1つのPDF（複数ページ）に生成する便利関数

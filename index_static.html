@@ -560,7 +560,7 @@
         // Python label生成コード（Noto Sans JP使用版 + Pydantic設定モデル）
         const labelPythonCode = `
 from dataclasses import dataclass, field
-from typing import Optional, Literal
+from typing import Literal
 from io import BytesIO
 
 from reportlab.pdfgen import canvas
@@ -588,7 +588,7 @@ class FontsConfig:
     postal_code: int = 13
     address: int = 11
     name: int = 14
-    honorific: Optional[int] = None
+    honorific: int | None = None
     phone: int = 13
 
 @dataclass
@@ -670,21 +670,57 @@ class LabelLayoutConfig:
     phone: PhoneConfig = field(default_factory=PhoneConfig)
     section_height: SectionHeightConfig = field(default_factory=SectionHeightConfig)
 
-def load_layout_config(config_path=None):
-    """レイアウト設定をロード（YAML読み込みは次のタスクで実装）"""
+    def __post_init__(self):
+        """セクション高さの合計がlabel_heightと一致することを検証"""
+        total_height = (
+            self.section_height.to_section_height + self.section_height.from_section_height
+        )
+
+        # 誤差0.1mm許容
+        if abs(total_height - self.layout.label_height) > 0.1:
+            raise ValueError(
+                f"セクション高さの合計 ({total_height}mm) が "
+                f"label_height ({self.layout.label_height}mm) と一致しません。"
+            )
+
+def load_layout_config(config_path=None, config_dict=None):
+    """
+    レイアウト設定をロード
+
+    Args:
+        config_path: 設定ファイルのパス（Noneの場合はデフォルト設定を使用）
+        config_dict: 設定辞書（UI設定やlocalStorageから取得）
+
+    Returns:
+        LabelLayoutConfig: レイアウト設定
+
+    Note:
+        - config_dictとconfig_pathの両方が指定された場合、config_dictが優先されます
+    """
+    # 辞書が渡された場合は辞書から設定を構築
+    if config_dict is not None:
+        if not config_dict:
+            # 空の辞書の場合はデフォルト設定を返す
+            return LabelLayoutConfig()
+        # 辞書から設定オブジェクトを構築
+        return LabelLayoutConfig(**config_dict)
+
+    # ファイルパスが指定されていない場合はデフォルト設定を使用
     if config_path is None:
         return LabelLayoutConfig()
-    raise NotImplementedError("YAML loading will be implemented in the next task")
+
+    # YAMLファイル読み込みは静的HTML版では未実装（fetch() + js-yamlで実装可能）
+    raise NotImplementedError("YAML loading in static HTML version requires fetch() + js-yaml")
 
 @dataclass
 class AddressInfo:
     postal_code: str
     address1: str
     name: str
-    address2: Optional[str] = None
-    address3: Optional[str] = None
-    phone: Optional[str] = None
-    honorific: Optional[str] = None
+    address2: str | None = None
+    address3: str | None = None
+    phone: str | None = None
+    honorific: str | None = None
 
     def __post_init__(self):
         if not self.postal_code:
@@ -695,10 +731,16 @@ class AddressInfo:
             raise ValueError("氏名は必須です")
 
 class LabelGenerator:
-    def __init__(self, font_path=None, config_path=None):
+    def __init__(self, font_path=None, config_path=None, config_dict=None):
+        """
+        Args:
+            font_path: 日本語フォントのパス（Noneの場合はフォールバックを試行）
+            config_path: レイアウト設定ファイルのパス（Noneの場合はデフォルト設定を使用）
+            config_dict: レイアウト設定辞書（静的HTML版やUI設定から渡される場合に使用）
+        """
         self.font_name = "IPAGothic"
         self.font_path = font_path
-        self.config = load_layout_config(config_path)
+        self.config = load_layout_config(config_path=config_path, config_dict=config_dict)
         self._setup_font()
 
     def _setup_font(self):
@@ -972,21 +1014,44 @@ class LabelGenerator:
 
         return lines
 
-def create_label_bytes(to_info, from_info, layout_mode="center", font_path=None):
-    generator = LabelGenerator(font_path=font_path, config_path=None)
+def create_label_bytes(to_info, from_info, layout_mode="center", font_path=None, config_dict=None):
+    """
+    ラベルPDFをバイトストリームで生成する便利関数
+
+    Args:
+        to_info: お届け先情報
+        from_info: ご依頼主情報
+        layout_mode: レイアウトモード（"center" or "grid_4up"）
+        font_path: 日本語フォントのパス
+        config_dict: レイアウト設定辞書（静的HTML版やUI設定から渡される場合に使用）
+
+    Returns:
+        PDFのバイトストリーム
+    """
+    generator = LabelGenerator(font_path=font_path, config_path=None, config_dict=config_dict)
     # layout_modeは設定オブジェクトに反映
     generator.config.layout.layout_mode = layout_mode
     return generator.generate(to_info, from_info)
 
-def create_batch_labels_bytes(label_data_list, font_path=None):
-    """複数のラベルを一括生成（4件ごとに1ページ）"""
+def create_batch_labels_bytes(label_data_list, font_path=None, config_dict=None):
+    """
+    複数のラベルを4upレイアウトで1つのPDF（複数ページ）に生成する便利関数
+
+    Args:
+        label_data_list: (お届け先, ご依頼主) のタプルのリスト
+        font_path: 日本語フォントのパス
+        config_dict: レイアウト設定辞書（静的HTML版やUI設定から渡される場合に使用）
+
+    Returns:
+        PDFのバイトストリーム
+    """
     from io import BytesIO
 
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
 
-    generator = LabelGenerator(font_path=font_path, config_path=None)
+    generator = LabelGenerator(font_path=font_path, config_path=None, config_dict=config_dict)
     label_width = generator.config.layout.label_width * mm
     label_height = generator.config.layout.label_height * mm
 
@@ -1374,14 +1439,18 @@ try:
         labels_json.append({
             'to': {
                 'postal_code': to_info.postal_code,
-                'address': to_info.address,
+                'address1': to_info.address1,
+                'address2': to_info.address2,
+                'address3': to_info.address3,
                 'name': to_info.name,
                 'phone': to_info.phone,
                 'honorific': to_info.honorific
             },
             'from': {
                 'postal_code': from_info.postal_code,
-                'address': from_info.address,
+                'address1': from_info.address1,
+                'address2': from_info.address2,
+                'address3': from_info.address3,
                 'name': from_info.name,
                 'phone': from_info.phone,
                 'honorific': from_info.honorific
@@ -1412,14 +1481,18 @@ label_data_list = []
 for label in labels_array:
     to_info = AddressInfo(
         postal_code=label['to']['postal_code'],
-        address=label['to']['address'],
+        address1=label['to']['address1'],
+        address2=label['to']['address2'],
+        address3=label['to']['address3'],
         name=label['to']['name'],
         phone=label['to']['phone'],
         honorific=label['to']['honorific']
     )
     from_info = AddressInfo(
         postal_code=label['from']['postal_code'],
-        address=label['from']['address'],
+        address1=label['from']['address1'],
+        address2=label['from']['address2'],
+        address3=label['from']['address3'],
         name=label['from']['name'],
         phone=label['from']['phone'],
         honorific=label['from']['honorific']

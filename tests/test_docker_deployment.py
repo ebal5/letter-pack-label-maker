@@ -23,7 +23,11 @@ except ImportError:
 
 from deployment_verifier import DockerVerifier
 
-pytestmark = pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker SDK not installed")
+# このファイルの全テストにdeployment_verificationマーカーとskipifを適用
+pytestmark = [
+    pytest.mark.deployment_verification,
+    pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker SDK not installed"),
+]
 
 
 @pytest.fixture

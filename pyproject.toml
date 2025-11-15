@@ -83,5 +83,6 @@ markers = [
     "docker: marks tests that require Docker",
     "performance: marks performance measurement tests",
     "integration: marks integration tests",
+    "deployment_verification: marks deployment verification tests (requires Playwright, excluded from main workflow)",
 ]
 asyncio_mode = "auto"

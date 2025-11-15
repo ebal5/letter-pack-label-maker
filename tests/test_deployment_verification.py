@@ -16,6 +16,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "tools"))
 
 from deployment_verifier import GitHubPagesVerifier, LinkCheckResult
 
+# このファイルの全テストにdeployment_verificationマーカーを適用
+pytestmark = pytest.mark.deployment_verification
+
 
 @pytest.fixture
 def github_verifier():

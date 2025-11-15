@@ -649,6 +649,7 @@ class SectionHeightConfig:
     """セクション高さ設定（実測値ベース）"""
     to_section_height: float = 69
     from_section_height: float = 53
+    divider_line_width: float = 2.5
     from_section_font_scale: float = 0.7
     from_address_max_lines: int = 2
     from_address_name_gap: int = 9
@@ -772,9 +773,9 @@ class LabelGenerator:
         to_section_height = self.config.section_height.to_section_height * mm
         from_section_height = self.config.section_height.from_section_height * mm
 
-        # 区切り線（太さは2.5ポイント固定）
+        # 区切り線（太さは設定から取得）
         c.setStrokeColorRGB(0, 0, 0)
-        c.setLineWidth(2.5)
+        c.setLineWidth(self.config.section_height.divider_line_width)
         divider_y = y_offset + from_section_height
         c.line(x_offset, divider_y, x_offset + label_width, divider_y)
 

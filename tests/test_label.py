@@ -187,6 +187,7 @@ def test_load_default_config():
     # セクション高さの設定を確認
     assert config.section_height.to_section_height == 69
     assert config.section_height.from_section_height == 53
+    assert config.section_height.divider_line_width == 2.5
     assert config.section_height.from_section_font_scale == 0.7
 
 

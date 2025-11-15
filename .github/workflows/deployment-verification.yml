@@ -45,9 +45,9 @@ jobs:
     name: Verify GitHub Pages Deployment
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'workflow_dispatch' &&
-      (github.event.inputs.check_type == 'all' ||
-       github.event.inputs.check_type == 'github-pages') ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.check_type == 'all' ||
+        github.event.inputs.check_type == 'github-pages')) ||
       github.event_name == 'workflow_run' ||
       github.event_name == 'schedule' ||
       github.event_name == 'pull_request'
@@ -134,9 +134,9 @@ jobs:
     name: Verify Docker Deployment
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'workflow_dispatch' &&
-      (github.event.inputs.check_type == 'all' ||
-       github.event.inputs.check_type == 'docker') ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.check_type == 'all' ||
+        github.event.inputs.check_type == 'docker')) ||
       github.event_name == 'pull_request'
     timeout-minutes: 20
 
@@ -188,9 +188,9 @@ jobs:
     name: Measure Performance
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'workflow_dispatch' &&
-      (github.event.inputs.check_type == 'all' ||
-       github.event.inputs.check_type == 'performance') ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.check_type == 'all' ||
+        github.event.inputs.check_type == 'performance')) ||
       github.event_name == 'schedule'
     timeout-minutes: 15
 

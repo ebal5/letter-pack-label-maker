@@ -42,6 +42,7 @@ github_pages:
     follow_external: true     # 外部リンクもチェックする
     timeout_seconds: 10       # タイムアウト時間
     max_retries: 3            # リトライ回数
+    max_concurrent: 5         # 最大同時接続数（並列実行の制限）
     ignore_patterns:          # 無視するパターン
       - "mailto:"
       - "#"

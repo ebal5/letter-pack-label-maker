@@ -161,12 +161,19 @@ class PerformanceMonitor:
                 self._log("Waiting for Pyodide initialization...")
                 pyodide_start = time.time()
                 try:
-                    await page.wait_for_selector("#label-form", timeout=90000)
+                    # config.yamlからタイムアウト値を読み込む
+                    config = self.config.get("github_pages", {})
+                    thresholds = config.get("performance_thresholds", {})
+                    timeout_ms = int(thresholds.get("pyodide_init_ms", 90000))
+
+                    await page.wait_for_selector("#label-form", timeout=timeout_ms)
                     pyodide_time = (time.time() - pyodide_start) * 1000
                     metrics.pyodide_init_ms = pyodide_time
                     self._log(f"Pyodide initialization: {pyodide_time:.0f}ms")
+                except asyncio.TimeoutError:
+                    self._log(f"Pyodide initialization timeout after {timeout_ms}ms", "WARNING")
                 except Exception as e:
-                    self._log(f"Pyodide initialization timeout: {e}", "WARNING")
+                    self._log(f"Pyodide initialization failed: {e}", "WARNING")
 
                 # メモリ使用量
                 if psutil is not None:

@@ -293,8 +293,73 @@ class GitHubPagesVerifier(DeploymentVerifier):
                 result.errors.append(f"Critical element not found: {description}")
                 self._log(f"  ❌ {description}: Not found", "ERROR")
 
+    async def _check_single_link(
+        self, link: str, base_url: str, page, timeout_seconds: int, semaphore: asyncio.Semaphore
+    ) -> LinkCheckResult:
+        """単一のリンクをチェック（並列実行用ヘルパーメソッド）
+
+        Args:
+            link: チェックするリンク
+            base_url: ベースURL
+            page: Playwrightのページオブジェクト
+            timeout_seconds: タイムアウト時間
+            semaphore: 並列実行制限用のセマフォ
+
+        Returns:
+            リンクチェック結果
+        """
+        is_external = not link.startswith(base_url)
+
+        async with semaphore:  # 最大同時接続数を制限
+            try:
+                # HEAD リクエストでリンクをチェック
+                if requests is not None:
+                    # requestsは同期APIなので、executorで実行
+                    loop = asyncio.get_event_loop()
+                    response = await loop.run_in_executor(
+                        None, lambda: requests.head(link, timeout=timeout_seconds, allow_redirects=True)
+                    )
+
+                    # 405 Method Not Allowed の場合は GET で再試行
+                    if response.status_code == 405:
+                        self._log(f"  HEAD failed (405), retrying with GET: {link}", "DEBUG")
+                        response = await loop.run_in_executor(
+                            None,
+                            lambda: requests.get(link, timeout=timeout_seconds, allow_redirects=True),
+                        )
+
+                    return LinkCheckResult(
+                        url=link,
+                        status=response.status_code,
+                        ok=response.ok,
+                        is_external=is_external,
+                    )
+                else:
+                    # requestsがない場合はPlaywrightを使用
+                    response = await page.request.head(link)
+
+                    # 405 Method Not Allowed の場合は GET で再試行
+                    if response.status == 405:
+                        self._log(f"  HEAD failed (405), retrying with GET: {link}", "DEBUG")
+                        response = await page.request.get(link)
+
+                    return LinkCheckResult(
+                        url=link,
+                        status=response.status,
+                        ok=response.ok,
+                        is_external=is_external,
+                    )
+            except Exception as e:
+                return LinkCheckResult(
+                    url=link,
+                    status=None,
+                    ok=False,
+                    error=str(e),
+                    is_external=is_external,
+                )
+
     async def _check_links(self, page, base_url: str, config: dict) -> list[LinkCheckResult]:
-        """ページ内のリンクをチェック
+        """ページ内のリンクをチェック（並列実行）
 
         Args:
             page: Playwrightのページオブジェクト
@@ -307,6 +372,7 @@ class GitHubPagesVerifier(DeploymentVerifier):
         link_config = config.get("link_check", {})
         ignore_patterns = link_config.get("ignore_patterns", [])
         timeout_seconds = link_config.get("timeout_seconds", 10)
+        max_concurrent = link_config.get("max_concurrent", 5)  # 最大同時接続数
 
         # ページ内のすべてのリンクを抽出
         links = await page.evaluate(
@@ -317,52 +383,25 @@ class GitHubPagesVerifier(DeploymentVerifier):
         """
         )
 
-        # 重複を削除
-        unique_links = list(set(links))
-        results = []
+        # 重複を削除し、無視パターンをフィルタ
+        unique_links = [
+            link
+            for link in set(links)
+            if not any(pattern in link for pattern in ignore_patterns)
+        ]
 
-        for link in unique_links:
-            # 無視パターンのチェック
-            if any(pattern in link for pattern in ignore_patterns):
-                continue
+        # 並列実行用のセマフォ（最大同時接続数を制限）
+        semaphore = asyncio.Semaphore(max_concurrent)
 
-            is_external = not link.startswith(base_url)
+        # すべてのリンクを並列でチェック
+        tasks = [
+            self._check_single_link(link, base_url, page, timeout_seconds, semaphore)
+            for link in unique_links
+        ]
 
-            try:
-                # HEAD リクエストでリンクをチェック
-                if requests is not None:
-                    response = requests.head(link, timeout=timeout_seconds, allow_redirects=True)
-                    results.append(
-                        LinkCheckResult(
-                            url=link,
-                            status=response.status_code,
-                            ok=response.ok,
-                            is_external=is_external,
-                        )
-                    )
-                else:
-                    # requestsがない場合はPlaywrightを使用
-                    response = await page.request.head(link)
-                    results.append(
-                        LinkCheckResult(
-                            url=link,
-                            status=response.status,
-                            ok=response.ok,
-                            is_external=is_external,
-                        )
-                    )
-            except Exception as e:
-                results.append(
-                    LinkCheckResult(
-                        url=link,
-                        status=None,
-                        ok=False,
-                        error=str(e),
-                        is_external=is_external,
-                    )
-                )
+        results = await asyncio.gather(*tasks)
 
-        return results
+        return list(results)
 
 
 class DockerVerifier(DeploymentVerifier):
@@ -393,10 +432,15 @@ class DockerVerifier(DeploymentVerifier):
         try:
             client = docker.from_env()
             self._log("✅ Connected to Docker daemon")
-        except Exception as e:
-            self._log(f"❌ Cannot connect to Docker daemon: {e}", "ERROR")
+        except docker.errors.DockerException as e:
+            self._log(f"❌ Docker daemon error: {e}", "ERROR")
             result.errors.append(f"Docker daemon not running: {e}")
             result.message = "Verification failed: Docker daemon error"
+            return result
+        except Exception as e:
+            self._log(f"❌ Unexpected error connecting to Docker: {e}", "ERROR")
+            result.errors.append(f"Failed to connect to Docker: {type(e).__name__}: {e}")
+            result.message = "Verification failed: Docker connection error"
             return result
 
         # イメージのビルド

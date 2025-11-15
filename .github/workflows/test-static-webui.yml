@@ -120,13 +120,17 @@ jobs:
 
               // お届け先フィールドの存在を確認
               await expect(page.locator('#to_postal')).toBeVisible();
-              await expect(page.locator('#to_address')).toBeVisible();
+              await expect(page.locator('#to_address1')).toBeVisible();
+              await expect(page.locator('#to_address2')).toBeVisible();
+              await expect(page.locator('#to_address3')).toBeVisible();
               await expect(page.locator('#to_name')).toBeVisible();
               await expect(page.locator('#to_phone')).toBeVisible();
 
               // ご依頼主フィールドの存在を確認
               await expect(page.locator('#from_postal')).toBeVisible();
-              await expect(page.locator('#from_address')).toBeVisible();
+              await expect(page.locator('#from_address1')).toBeVisible();
+              await expect(page.locator('#from_address2')).toBeVisible();
+              await expect(page.locator('#from_address3')).toBeVisible();
               await expect(page.locator('#from_name')).toBeVisible();
               await expect(page.locator('#from_phone')).toBeVisible();
 

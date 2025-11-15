@@ -44,6 +44,12 @@ TEST_DEPENDENCIES = {
         "src/letterpack/csv_parser.py",
         "src/letterpack/label.py",  # csv_parser.pyが label.pyに依存
     },
+    "test_multi_interface.py": {
+        "src/letterpack/label.py",
+        "src/letterpack/csv_parser.py",
+        "src/letterpack/cli.py",
+        "src/letterpack/web.py",
+    },
 }
 
 

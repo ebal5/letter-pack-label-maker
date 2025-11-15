@@ -46,6 +46,30 @@ uv sync --all-extras
 uv run pytest
 ```
 
+### Claude Code専用ツール
+
+このプロジェクトで利用できるClaude Code専用ツール：
+
+#### Font Diagnostic Skill
+- **ファイル**: `.claude/skills/font-diagnostic/`
+- **目的**: フォント環境の診断と問題解決
+- **トリガーキーワード**: "フォント診断", "フォント問題", "日本語が表示されない"
+- **対応環境**: Docker環境、ローカル環境（CLI）
+- **Pyodide対応**: 未対応（ブラウザでは実行不可）
+- **使用例**: "フォント環境を確認してください" → スクリプトが自動実行
+
+**詳細**: `.claude/skills/font-diagnostic/README.md` を参照
+
+**手動実行**:
+```bash
+# 基本的な診断
+python tools/font_diagnostic.py
+
+# PDF内のフォント情報も確認（pypdfが必要）
+pip install pypdf
+python tools/font_diagnostic.py --pdf output.pdf
+```
+
 ### 推奨ワークフロー
 
 1. **変更前の確認**
@@ -65,7 +89,24 @@ uv run pytest
    - 明確なコミットメッセージで変更をコミット
    - 複数の関連する変更は1つのコミットにまとめる
 
-5. **GitHub Actionsとの統合**
+5. **PR作成/Push前の最終チェック** ⚠️ **必須**
+   - **ドキュメント整合性チェック**（特にAPIやデータ構造を変更した場合）
+     - `README.md` - サンプルコード、CSV形式、使用例の更新
+     - `examples/sample.csv` - サンプルCSVファイルの更新
+     - `STATIC_VERSION.md` - 静的HTML版のドキュメント更新（該当する場合）
+   - **テストスクリプトの更新**
+     - `generate_test_pdf.py` - GitHub Actions専用のテストスクリプト
+     - `.github/workflows/test-static-webui.yml` - Playwrightテストのコード
+     - その他のCI/CD関連スクリプト
+   - **静的HTML版の更新**（該当する場合）
+     - `index_static.html` - 埋め込みPythonコード、JavaScript、フォーム要素
+     - データ構造の変更が埋め込みコードに反映されているか確認
+   - **すべてのインターフェースでの動作確認**
+     - CLI版: `uv run python -m letterpack.cli`
+     - Webサーバー版: `uv run python -m letterpack.web`（該当する場合）
+     - 静的HTML版: ブラウザで`index_static.html`を開いて確認（該当する場合）
+
+6. **GitHub Actionsとの統合**
    - PRを作成すると自動的にテストが実行される（`.github/workflows/main.yml`）
    - 静的HTML版を変更すると自動的にPlaywrightテストが実行される（`.github/workflows/test-static-webui.yml`）
    - mainブランチにマージすると自動的にGitHub Pagesにデプロイされる（`.github/workflows/deploy-pages.yml`）
@@ -83,6 +124,11 @@ uv run pytest
 ### 注意が必要なタスク
 - ⚠️ PDF生成ロジックの大幅な変更（実際のレターパックのフォーマットとの整合性確認が必要）
 - ⚠️ 依存関係の大規模なアップグレード（動作確認が重要）
+- ⚠️ **データ構造やAPIの変更**（影響範囲が広いため、特に注意が必要）
+  - `AddressInfo`などのデータクラスのフィールド変更
+  - CSVフォーマットの変更
+  - フォーム要素のID/name属性の変更
+  - **必ず「PR作成/Push前の最終チェック」を実施すること**
 
 ## コンテキスト管理のヒント
 

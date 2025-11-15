@@ -21,7 +21,8 @@ COPY pyproject.toml README.md ./
 
 # uvを使ってrequirements.txtを生成
 # --no-dev: 開発用依存関係は除外
-RUN uv export --no-dev --no-hashes -o requirements.txt
+# --no-emit-project: プロジェクト自体を除外（後でeditable installする）
+RUN uv export --no-dev --no-hashes --no-emit-project -o requirements.txt
 
 # ===== 実行ステージ =====
 FROM python:3.12-slim

@@ -186,6 +186,38 @@ docker compose up -d
 
 詳細は [DOCKER.md](DOCKER.md) を参照してください。
 
+## デプロイメント検証
+
+このプロジェクトには、GitHub Pages、Docker環境、ローカル環境のデプロイメントを自動検証する機能が含まれています。
+
+### 検証内容
+
+- **GitHub Pages検証**: ページアクセス、Pyodide初期化、必須要素の確認、リンク整合性チェック
+- **Docker検証**: イメージビルド、コンテナ起動、ヘルスチェック、フォント確認
+- **パフォーマンス計測**: ページロード時間、Pyodide初期化時間、メモリ使用量の監視
+- **回帰検出**: ベースラインとの比較によるパフォーマンス低下の検出
+
+### 使い方
+
+Claude Codeを使用している場合、以下のトリガーフレーズで検証を実行できます：
+
+- 「デプロイメント検証を実行して」
+- 「GitHub Pagesが正常に動作しているか確認して」
+- 「Dockerイメージの検証を実行」
+
+詳細は [`.claude/skills/deployment-verification/README.md`](.claude/skills/deployment-verification/README.md) を参照してください。
+
+### GitHub Actionsでの自動検証
+
+デプロイメント検証は、以下のタイミングで自動実行されます：
+
+- GitHub Pagesへのデプロイ完了後
+- PR作成時（設定ファイル変更時）
+- 毎日のヘルスチェック（9:00 UTC / 18:00 JST）
+- 手動トリガー
+
+検証結果はGitHub ActionsのArtifactsとしてダウンロード可能です。
+
 ## 設定ファイル（Configuration Files）
 
 レターパックラベルのレイアウトは、YAML設定ファイルでカスタマイズできます。

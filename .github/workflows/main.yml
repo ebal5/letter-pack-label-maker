@@ -41,10 +41,11 @@ jobs:
       run: mkdir -p test-output
 
     # pytest実行（テストPDF生成）
+    # deployment_verificationテストは除外（専用ワークフローで実行）
     - name: Run pytest
       env:
         TEST_OUTPUT_DIR: test-output
-      run: uv run pytest -v
+      run: uv run pytest -v -m "not deployment_verification"
 
     # テストPDFの生成
     - name: Generate test PDF

@@ -32,6 +32,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
     "ruff>=0.8.0",
     "ty>=0.0.1a1",
     "PyPDF2>=3.0.0",
@@ -39,6 +40,8 @@ dev = [
     "pytest-playwright>=0.4.0",
     "psutil>=5.9.0",
     "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "docker>=7.0.0",
 ]
 
 [project.scripts]
@@ -75,3 +78,11 @@ indent-style = "space"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "docker: marks tests that require Docker",
+    "performance: marks performance measurement tests",
+    "integration: marks integration tests",
+    "deployment_verification: marks deployment verification tests (requires Playwright, excluded from main workflow)",
+]
+asyncio_mode = "auto"

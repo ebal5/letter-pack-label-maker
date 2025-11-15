@@ -240,7 +240,29 @@ python tools/label_adjuster.py
 
 詳細は [tools/README.md](tools/README.md) を参照してください。
 
+### ドキュメント自動生成
+
+設定ファイルとドキュメントは、Pydanticモデル定義から自動生成できます。これにより、パラメータ追加時のドキュメント更新漏れを防ぐことができます。
+
+```bash
+# YAML設定ファイルとMarkdownドキュメントを生成
+uv run python tools/generate_config_docs.py
+
+# プレビューのみ（ファイルを更新しない）
+uv run python tools/generate_config_docs.py --dry-run
+
+# YAMLのみ生成
+uv run python tools/generate_config_docs.py --yaml-only
+```
+
+生成されるファイル:
+- `config/label_layout.yaml` - YAML設定ファイル
+- `config/readme_config_reference.md` - README.md用の設定リファレンス（手動統合が必要）
+
 ## 設定リファレンス（Configuration Reference）
+
+> **注意**: このセクションは `tools/generate_config_docs.py` によって自動生成できます。
+> Pydanticモデル定義を変更した場合は、このスクリプトを実行してドキュメントを更新してください。
 
 ### Layout Settings（レイアウト設定）
 

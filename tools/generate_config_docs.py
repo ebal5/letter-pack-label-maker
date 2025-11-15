@@ -20,7 +20,7 @@ Pydanticモデルから設定ドキュメントを自動生成するスクリプ
 import argparse
 import sys
 from pathlib import Path
-from typing import get_args, get_origin
+from typing import Union, get_args, get_origin
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -29,39 +29,63 @@ from pydantic.fields import FieldInfo
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
-from letterpack.label import (  # noqa: E402
-    AddressLayoutConfig,
-    BorderConfig,
-    DottedLineConfig,
-    FontsConfig,
-    LayoutConfig,
-    PhoneConfig,
-    PostalBoxConfig,
-    SamaConfig,
-    SectionHeightConfig,
-    SpacingConfig,
-)
+try:
+    from letterpack.label import (  # noqa: E402
+        AddressLayoutConfig,
+        BorderConfig,
+        DottedLineConfig,
+        FontsConfig,
+        LayoutConfig,
+        PhoneConfig,
+        PostalBoxConfig,
+        SamaConfig,
+        SectionHeightConfig,
+        SpacingConfig,
+    )
+except ImportError as e:
+    print(
+        f"✗ Error importing Pydantic models from letterpack.label: {e}",
+        file=sys.stderr,
+    )
+    print(
+        "  Make sure you're running this script from the project root directory.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 
 def get_field_type_string(field_info: FieldInfo) -> str:
     """フィールドの型を文字列として取得"""
     annotation = field_info.annotation
 
-    # Optional型の処理
+    # Union型（Optional含む）の処理
     origin = get_origin(annotation)
-    if origin is type(None) or (
-        hasattr(annotation, "__args__") and type(None) in get_args(annotation)
-    ):
-        # Optional[int] -> int | None の場合
+    if origin is Union:
         args = get_args(annotation)
         if args:
+            # None型を除外した型のリスト
             non_none_types = [arg for arg in args if arg is not type(None)]
             if non_none_types:
-                return non_none_types[0].__name__ + " | None"
+                # None型が含まれている場合（Optional型）
+                if type(None) in args:
+                    if len(non_none_types) == 1:
+                        # Optional[int] -> "int | None"
+                        type_name = getattr(non_none_types[0], "__name__", str(non_none_types[0]))
+                        return f"{type_name} | None"
+                    else:
+                        # Union[int, float, None] -> "int | float | None"
+                        type_names = [getattr(t, "__name__", str(t)) for t in non_none_types]
+                        return " | ".join(type_names) + " | None"
+                else:
+                    # Union[int, float] -> "int | float"
+                    type_names = [getattr(t, "__name__", str(t)) for t in args]
+                    return " | ".join(type_names)
 
+    # 通常の型
     if hasattr(annotation, "__name__"):
         return annotation.__name__
 
+    # フォールバック
     return str(annotation)
 
 
@@ -100,22 +124,6 @@ def get_constraint_range(field_info: FieldInfo) -> str | None:
         parts.append(f"≤ {constraints['le']}")
 
     return " ".join(parts) if len(parts) > 1 else None
-
-
-def get_unit_from_description(description: str | None) -> str:
-    """説明文から単位を抽出"""
-    if not description:
-        return "-"
-
-    # 単位のパターンマッチング
-    if "(mm)" in description:
-        return "mm"
-    elif "(pt)" in description:
-        return "pt"
-    elif "(px)" in description:
-        return "px"
-    else:
-        return "-"
 
 
 def generate_yaml_for_model(
@@ -344,37 +352,54 @@ def main():
     )
     args = parser.parse_args()
 
-    # YAMLファイル生成
-    if not args.markdown_only:
-        print("Generating YAML configuration file...")
-        yaml_content = generate_yaml_config()
+    try:
+        # YAMLファイル生成
+        if not args.markdown_only:
+            print("Generating YAML configuration file...")
+            yaml_content = generate_yaml_config()
 
-        if args.dry_run:
-            print("\n--- config/label_layout.yaml (preview) ---")
-            print(yaml_content[:500] + "...\n(truncated)")
-        else:
-            yaml_path = project_root / "config" / "label_layout.yaml"
-            yaml_path.write_text(yaml_content, encoding="utf-8")
-            print(f"✓ Generated: {yaml_path}")
+            if args.dry_run:
+                print("\n--- config/label_layout.yaml (preview) ---")
+                print(yaml_content[:500] + "...\n(truncated)")
+            else:
+                yaml_path = project_root / "config" / "label_layout.yaml"
+                try:
+                    yaml_path.write_text(yaml_content, encoding="utf-8")
+                    print(f"✓ Generated: {yaml_path}")
+                except OSError as e:
+                    print(f"✗ Error writing YAML file: {e}", file=sys.stderr)
+                    return 1
 
-    # Markdownドキュメント生成
-    if not args.yaml_only:
-        print("Generating Markdown documentation...")
-        readme_content = generate_readme_config_reference()
+        # Markdownドキュメント生成
+        if not args.yaml_only:
+            print("Generating Markdown documentation...")
+            readme_content = generate_readme_config_reference()
 
-        if args.dry_run:
-            print("\n--- README.md section (preview) ---")
-            print(readme_content[:500] + "...\n(truncated)")
-        else:
-            # 注意: README.mdの更新は別途手動で行う必要がある
-            # （既存コンテンツとの統合が必要なため）
-            output_path = project_root / "config" / "readme_config_reference.md"
-            output_path.write_text(readme_content, encoding="utf-8")
-            print(f"✓ Generated: {output_path}")
-            print("  Note: Please manually merge this into README.md")
+            if args.dry_run:
+                print("\n--- README.md section (preview) ---")
+                print(readme_content[:500] + "...\n(truncated)")
+            else:
+                # 注意: README.mdの更新は別途手動で行う必要がある
+                # （既存コンテンツとの統合が必要なため）
+                output_path = project_root / "config" / "readme_config_reference.md"
+                try:
+                    output_path.write_text(readme_content, encoding="utf-8")
+                    print(f"✓ Generated: {output_path}")
+                    print("  Note: Please manually merge this into README.md")
+                except OSError as e:
+                    print(f"✗ Error writing Markdown file: {e}", file=sys.stderr)
+                    return 1
 
-    print("\nDone!")
+        print("\nDone!")
+        return 0
+
+    except Exception as e:
+        print(f"✗ Unexpected error: {e}", file=sys.stderr)
+        import traceback
+
+        traceback.print_exc()
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

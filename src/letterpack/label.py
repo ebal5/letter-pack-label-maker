@@ -154,10 +154,10 @@ class SectionHeightConfig(BaseModel):
     """セクション高さ設定（実測値ベース）"""
 
     to_section_height: float = Field(
-        default=68, gt=0, le=200, description="お届け先セクションの高さ (mm)。実測値"
+        default=69, gt=0, le=200, description="お届け先セクションの高さ (mm)"
     )
     from_section_height: float = Field(
-        default=52, gt=0, le=200, description="ご依頼主セクションの高さ (mm)。実測値"
+        default=53, gt=0, le=200, description="ご依頼主セクションの高さ (mm)"
     )
     from_section_font_scale: float = Field(
         default=0.7,

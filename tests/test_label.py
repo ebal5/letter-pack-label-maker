@@ -185,8 +185,8 @@ def test_load_default_config():
     assert config.postal_box.text_vertical_offset == 2
     assert config.spacing.postal_box_offset_y == -2
     # セクション高さの設定を確認
-    assert config.section_height.to_section_height == 68
-    assert config.section_height.from_section_height == 52
+    assert config.section_height.to_section_height == 69
+    assert config.section_height.from_section_height == 53
     assert config.section_height.from_section_font_scale == 0.7
 
 

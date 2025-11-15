@@ -91,7 +91,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
       await page.waitForSelector('#label-form', { timeout: 90000 });
 
       const report = await page.evaluate(async () => {
-        return await window.PyodideDiagnostics.generateReport();
+        return await window.LetterPackDebug.PyodideDiagnostics.generateReport();
       });
 
       // レポートの構造を確認
@@ -110,7 +110,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
       await page.waitForSelector('#label-form', { timeout: 90000 });
 
       const report = await page.evaluate(async () => {
-        return await window.PyodideDiagnostics.generateReport();
+        return await window.LetterPackDebug.PyodideDiagnostics.generateReport();
       });
 
       // フォント状態を確認
@@ -135,7 +135,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
       await page.waitForSelector('#label-form', { timeout: 90000 });
 
       const report = await page.evaluate(async () => {
-        return await window.PyodideDiagnostics.generateReport();
+        return await window.LetterPackDebug.PyodideDiagnostics.generateReport();
       });
 
       // 環境情報を確認
@@ -167,7 +167,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
 
       // キャッシュにアクセス
       const cached = await page.evaluate(async () => {
-        const font = await window.FontCacheManager.get('noto-sans-jp-bold-v52');
+        const font = await window.LetterPackDebug.FontCacheManager.get('noto-sans-jp-bold-v52');
         return font !== null;
       });
 
@@ -181,14 +181,14 @@ test.describe('Pyodide Integration Advanced Tests', () => {
 
       // まずキャッシュに何があるか確認
       const beforeClear = await page.evaluate(async () => {
-        const font = await window.FontCacheManager.get('noto-sans-jp-bold-v52');
+        const font = await window.LetterPackDebug.FontCacheManager.get('noto-sans-jp-bold-v52');
         console.log('Before clear: font exists =', font !== null);
         return font !== null;
       });
 
       // キャッシュをクリア
       const cleared = await page.evaluate(async () => {
-        const result = await window.FontCacheManager.clear();
+        const result = await window.LetterPackDebug.FontCacheManager.clear();
         console.log('Clear result:', result);
         return result;
       });
@@ -201,7 +201,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
       // キャッシュが空になっていることを確認
       const cached = await page.evaluate(async () => {
         // 新しいDBコネクションで確認
-        const font = await window.FontCacheManager.get('noto-sans-jp-bold-v52');
+        const font = await window.LetterPackDebug.FontCacheManager.get('noto-sans-jp-bold-v52');
         console.log('After clear: font exists =', font !== null, 'font size =', font ? font.length : 0);
         return font !== null;
       });
@@ -240,7 +240,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
 
       const msg = await page.evaluate(() => {
         const error = new Error('Failed to fetch');
-        return window.ErrorHandler.getFriendlyMessage(error);
+        return window.LetterPackDebug.ErrorHandler.getFriendlyMessage(error);
       });
 
       expect(msg).toContain('ネットワークエラー');
@@ -253,7 +253,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
 
       const msg = await page.evaluate(() => {
         const error = new Error('reportlab import failed');
-        return window.ErrorHandler.getFriendlyMessage(error);
+        return window.LetterPackDebug.ErrorHandler.getFriendlyMessage(error);
       });
 
       expect(msg).toContain('ReportLab');
@@ -266,7 +266,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
 
       const msg = await page.evaluate(() => {
         const error = new Error('font loading failed');
-        return window.ErrorHandler.getFriendlyMessage(error);
+        return window.LetterPackDebug.ErrorHandler.getFriendlyMessage(error);
       });
 
       expect(msg).toContain('フォント');
@@ -279,7 +279,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
 
       const msg = await page.evaluate(() => {
         const error = new Error('memory heap quota exceeded');
-        return window.ErrorHandler.getFriendlyMessage(error);
+        return window.LetterPackDebug.ErrorHandler.getFriendlyMessage(error);
       });
 
       expect(msg).toContain('メモリ');
@@ -299,7 +299,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
 
       // エラーをトリガー（テスト用）
       await page.evaluate(() => {
-        window.ErrorHandler.logError('TestContext', new Error('Test error'));
+        window.LetterPackDebug.ErrorHandler.logError('TestContext', new Error('Test error'));
       });
 
       // 少し待機してからログを確認
@@ -316,7 +316,7 @@ test.describe('Pyodide Integration Advanced Tests', () => {
       await page.waitForSelector('#label-form', { timeout: 90000 });
 
       const integration = await page.evaluate(async () => {
-        const report = await window.PyodideDiagnostics.generateReport();
+        const report = await window.LetterPackDebug.PyodideDiagnostics.generateReport();
         const metrics = window.pyodideMetrics;
 
         // レポートのメトリクスと、グローバルのメトリクスが一致することを確認
@@ -338,9 +338,9 @@ test.describe('Pyodide Integration Advanced Tests', () => {
       // 複数のデバッグ操作を並行実行
       const results = await page.evaluate(async () => {
         const [report, fontStatus, metrics] = await Promise.all([
-          window.PyodideDiagnostics.generateReport(),
+          window.LetterPackDebug.PyodideDiagnostics.generateReport(),
           (async () => {
-            const cached = await window.FontCacheManager.get('noto-sans-jp-bold-v52');
+            const cached = await window.LetterPackDebug.FontCacheManager.get('noto-sans-jp-bold-v52');
             return cached !== null;
           })(),
           Promise.resolve(window.pyodideMetrics)

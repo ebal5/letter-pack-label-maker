@@ -321,14 +321,24 @@
             }
 
             static _getMemoryCaps() {
-                if (performance && performance.memory) {
-                    return {
-                        jsHeapSizeLimit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024) + 'MB',
-                        totalJSHeapSize: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + 'MB',
-                        usedJSHeapSize: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB'
-                    };
+                // 警告: performance.memory は Chrome/Edge 限定の非標準APIです
+                // Firefox、Safari では利用できません
+                // 将来的に廃止される可能性があるため、メモリ情報が取得できない場合も考慮してください
+                if (typeof performance !== 'undefined' &&
+                    performance.memory &&
+                    typeof performance.memory.jsHeapSizeLimit === 'number') {
+                    try {
+                        return {
+                            jsHeapSizeLimit: Math.round(performance.memory.jsHeapSizeLimit / 1024 / 1024) + 'MB',
+                            totalJSHeapSize: Math.round(performance.memory.totalJSHeapSize / 1024 / 1024) + 'MB',
+                            usedJSHeapSize: Math.round(performance.memory.usedJSHeapSize / 1024 / 1024) + 'MB',
+                            note: 'Chrome/Edge only (non-standard API)'
+                        };
+                    } catch (e) {
+                        console.warn('Failed to get memory caps:', e);
+                    }
                 }
-                return null;
+                return { note: 'Memory API not available in this browser' };
             }
 
             static _checkFontStatus() {
@@ -385,8 +395,7 @@
             }
         }
 
-        // Expose to window for testing
-        window.PyodideDiagnostics = PyodideDiagnostics;
+        // PyodideDiagnosticsクラスの定義完了（後で統一名前空間に公開）
 
         /**
          * IndexedDB Font Caching
@@ -458,7 +467,8 @@
 
                         // トランザクションの完了を待つ（確実にコミットされるように）
                         transaction.oncomplete = () => {
-                            db.close(); // DBをクローズして確実にフラッシュ
+                            // ブラウザがIndexedDB接続を自動管理するため、明示的なcloseは不要
+                            // 頻繁なopen/closeはパフォーマンスを低下させる可能性がある
                             resolve(true);
                         };
                         transaction.onerror = () => reject(transaction.error);
@@ -470,8 +480,7 @@
             }
         }
 
-        // Expose to window for testing
-        window.FontCacheManager = FontCacheManager;
+        // FontCacheManagerクラスの定義完了（後で統一名前空間に公開）
 
         /**
          * Enhanced Error Handler
@@ -518,8 +527,15 @@
             }
         }
 
-        // Expose to window for testing
-        window.ErrorHandler = ErrorHandler;
+        // ErrorHandlerクラスの定義完了（後で統一名前空間に公開）
+
+        // グローバル名前空間の汚染を避けるため、統一された名前空間に公開
+        // テスト用のAPIアクセスを提供しつつ、他のライブラリとの衝突を防ぐ
+        window.LetterPackDebug = {
+            PyodideDiagnostics,
+            FontCacheManager,
+            ErrorHandler
+        };
 
         // Python label生成コード（Noto Sans JP使用版）
         const labelPythonCode = `
@@ -1016,6 +1032,9 @@ def parse_csv_string(csv_content):
                     window.pyodideMetrics.fontMount = Math.max(performance.now() - stepStart, 0.001);
 
                     console.log(`Noto Sans JP Bold フォントの${fromCache ? 'キャッシュ' : 'ダウンロード'}完了 (${Math.round(fontBytes.length / 1024 / 1024 * 100) / 100}MB)`);
+
+                    // メモリ解放: 約2MBのフォントデータは使用後に明示的にnull化してGCを促す
+                    fontBytes = null;
                 } catch (fontError) {
                     ErrorHandler.logError('FontLoading', fontError);
                     console.warn('Noto Sans JP Bold のダウンロードに失敗、フォールバックを使用:', fontError.message);

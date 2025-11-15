@@ -1,0 +1,188 @@
+# Deployment Verification Configuration
+# このファイルは、デプロイメント検証の設定を定義します
+
+# GitHub Pagesの検証設定
+github_pages:
+  # 本番環境のURL（自動的にGitHub Pagesのユーザー名/リポジトリ名から構築される）
+  # production_url: "https://ebal5.github.io/letter-pack-label-maker/"
+  production_url: "https://ebal5.github.io/letter-pack-label-maker/"
+
+  # 検証するページのリスト
+  pages_to_check:
+    - path: "index.html"
+      description: "メインの静的HTML版"
+    - path: "poc_pyodide.html"
+      description: "Pyodide PoC版"
+
+  # 必須要素のチェック（CSSセレクター）
+  critical_elements:
+    - selector: "#loading-status"
+      description: "Pyodide読み込みステータス"
+      timeout_ms: 5000
+    - selector: "#label-form"
+      description: "ラベル生成フォーム"
+      timeout_ms: 90000  # Pyodide初期化待ち
+    - selector: "#generate-btn"
+      description: "PDF生成ボタン"
+      timeout_ms: 90000
+    - selector: "button[onclick='generateLabel()']"
+      description: "ラベル生成実行ボタン"
+      timeout_ms: 90000
+
+  # パフォーマンスの閾値（ミリ秒）
+  performance_thresholds:
+    page_load_ms: 3000       # ページロード時間
+    pyodide_init_ms: 90000   # Pyodide初期化時間
+    font_download_ms: 30000  # フォントダウンロード時間
+    fcp_ms: 2000            # First Contentful Paint
+    lcp_ms: 4000            # Largest Contentful Paint
+
+  # リンクチェックの設定
+  link_check:
+    follow_external: true     # 外部リンクもチェックする
+    timeout_seconds: 10       # タイムアウト時間
+    max_retries: 3            # リトライ回数
+    ignore_patterns:          # 無視するパターン
+      - "mailto:"
+      - "#"
+      - "javascript:"
+    # 外部リンクのチェックは警告のみ（エラーにしない）
+    external_as_warning: true
+
+# Docker環境の検証設定
+docker:
+  # Dockerイメージ名
+  image_name: "letterpack-web"
+  image_tag: "latest"
+
+  # テスト用コンテナ名
+  container_name: "letterpack-web-verification-test"
+
+  # ヘルスチェックのタイムアウト（秒）
+  health_check_timeout: 30
+
+  # コンテナのポート設定
+  ports:
+    web: 5000
+
+  # 環境変数（テスト用）
+  test_environment:
+    SECRET_KEY: "test-verification-key-do-not-use-in-production"
+
+  # イメージサイズの警告閾値（MB）
+  image_size_warning_mb: 500
+  image_size_error_mb: 1000
+
+  # 必須フォントのチェック
+  required_fonts:
+    - "Noto Sans CJK JP"
+    - "Noto Serif CJK JP"
+
+  # Webエンドポイントのチェック
+  endpoints:
+    - path: "/"
+      method: "GET"
+      expected_status: 200
+      expected_content: "レターパックラベル作成"
+    - path: "/health"
+      method: "GET"
+      expected_status: 200
+      expected_content: "healthy"
+
+# ローカル環境の検証設定
+local:
+  # CLIコマンド
+  cli_command: "uv run python -m letterpack.cli --help"
+
+  # Webサーバー起動コマンド
+  web_command: "uv run python -m letterpack.web"
+
+  # タイムアウト（秒）
+  test_timeout: 60
+
+  # PDF生成テスト
+  pdf_generation:
+    enabled: true
+    test_csv: "examples/sample.csv"
+    output_dir: "test_output"
+
+# パフォーマンス計測の設定
+performance:
+  # 計測を有効化
+  enabled: true
+
+  # ベースラインファイル
+  baseline_file: ".github/performance-baseline.json"
+
+  # パフォーマンス低下の警告閾値（%）
+  regression_warning_threshold: 10
+  regression_error_threshold: 20
+
+  # 計測項目
+  metrics:
+    - name: "github_pages_load"
+      description: "GitHub Pagesページロード時間"
+      target: "github_pages"
+    - name: "pyodide_init"
+      description: "Pyodide初期化時間"
+      target: "github_pages"
+    - name: "docker_startup"
+      description: "Dockerコンテナ起動時間"
+      target: "docker"
+    - name: "pdf_generation"
+      description: "PDF生成時間"
+      target: "all"
+
+# CI/CD統合の設定
+ci_cd:
+  # GitHub Actionsとの統合
+  github_actions:
+    enabled: true
+
+    # ワークフロー実行のトリガー
+    triggers:
+      - "deployment_complete"  # デプロイ完了後
+      - "pull_request"         # PR作成時
+      - "schedule"             # 定期実行
+
+    # Artifactの保持期間（日）
+    artifact_retention_days: 30
+
+    # パフォーマンスレポートの保持期間（日）
+    performance_retention_days: 90
+
+  # 通知設定（将来の拡張用）
+  notifications:
+    enabled: false
+    # Slack、Discord、メールなどの設定
+
+# レポート生成の設定
+reporting:
+  # レポートフォーマット
+  format: "markdown"  # markdown, html, json
+
+  # レポートに含める情報
+  include:
+    - "summary"          # サマリー
+    - "link_check"       # リンクチェック結果
+    - "performance"      # パフォーマンス計測
+    - "docker_info"      # Docker情報
+    - "screenshots"      # スクリーンショット（将来の拡張用）
+
+  # レポートの詳細レベル
+  verbosity: "normal"  # minimal, normal, verbose
+
+# デバッグ設定
+debug:
+  # デバッグモード
+  enabled: false
+
+  # 詳細ログ
+  verbose_logging: false
+
+  # スクリーンショット保存
+  save_screenshots: true
+  screenshot_dir: "verification_screenshots"
+
+  # Playwrightのトレース
+  playwright_trace: false

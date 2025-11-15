@@ -1,0 +1,273 @@
+name: Deployment Verification
+
+on:
+  # デプロイ完了後に実行
+  workflow_run:
+    workflows: ["Deploy to GitHub Pages"]
+    types: [completed]
+
+  # PRで実行（設定ファイル変更時）
+  pull_request:
+    paths:
+      - '.claude/skills/deployment-verification/**'
+      - 'tools/deployment_verifier.py'
+      - 'tools/performance_metrics.py'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/deploy-pages.yml'
+      - '.github/workflows/deployment-verification.yml'
+
+  # 手動トリガー
+  workflow_dispatch:
+    inputs:
+      check_type:
+        description: 'Verification type'
+        required: true
+        type: choice
+        options:
+          - all
+          - github-pages
+          - docker
+          - performance
+        default: 'all'
+
+  # 毎日のヘルスチェック（9:00 UTC = 18:00 JST）
+  schedule:
+    - cron: '0 9 * * *'
+
+jobs:
+  verify-github-pages:
+    name: Verify GitHub Pages Deployment
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.check_type == 'all' ||
+       github.event.inputs.check_type == 'github-pages') ||
+      github.event_name == 'workflow_run' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'pull_request'
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: |
+          uv sync --extra dev
+          uv pip install beautifulsoup4 requests psutil
+
+      - name: Install Playwright
+        run: |
+          uv run playwright install chromium
+          uv run playwright install-deps chromium
+
+      - name: Wait for GitHub Pages deployment
+        if: github.event_name == 'workflow_run'
+        run: |
+          echo "Waiting for GitHub Pages to be ready..."
+          sleep 30
+
+      - name: Run GitHub Pages verification
+        id: verify-pages
+        continue-on-error: true
+        run: |
+          uv run python tools/deployment_verifier.py \
+            --target github-pages \
+            --config .claude/skills/deployment-verification/config.yaml \
+            --output-file github-pages-report.md
+
+      - name: Run GitHub Pages tests
+        continue-on-error: true
+        run: |
+          uv run pytest tests/test_deployment_verification.py \
+            -v --tb=short -m "not slow" || true
+
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-pages-verification-report
+          path: github-pages-report.md
+          retention-days: 30
+
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let report = '## GitHub Pages Deployment Verification\n\n';
+
+            try {
+              if (fs.existsSync('github-pages-report.md')) {
+                const reportContent = fs.readFileSync('github-pages-report.md', 'utf8');
+                report += reportContent;
+              } else {
+                report += '⚠️ Verification report not generated.\n';
+              }
+            } catch (error) {
+              report += `❌ Error reading report: ${error.message}\n`;
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
+
+  verify-docker:
+    name: Verify Docker Deployment
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.check_type == 'all' ||
+       github.event.inputs.check_type == 'docker') ||
+      github.event_name == 'pull_request'
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: |
+          uv sync --extra dev
+          uv pip install docker
+
+      - name: Build Docker image
+        run: |
+          docker build -t letterpack-test .
+
+      - name: Run Docker verification
+        id: verify-docker
+        continue-on-error: true
+        run: |
+          uv run python tools/deployment_verifier.py \
+            --target docker \
+            --config .claude/skills/deployment-verification/config.yaml \
+            --output-file docker-report.md
+
+      - name: Run Docker tests
+        continue-on-error: true
+        run: |
+          uv run pytest tests/test_docker_deployment.py \
+            -v --tb=short -m "docker and not slow" || true
+
+      - name: Upload verification report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-verification-report
+          path: docker-report.md
+          retention-days: 30
+
+  measure-performance:
+    name: Measure Performance
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.check_type == 'all' ||
+       github.event.inputs.check_type == 'performance') ||
+      github.event_name == 'schedule'
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: |
+          uv sync --extra dev
+          uv pip install psutil
+
+      - name: Install Playwright
+        run: |
+          uv run playwright install chromium
+          uv run playwright install-deps chromium
+
+      - name: Create baseline if not exists
+        run: |
+          mkdir -p .github
+          if [ ! -f .github/performance-baseline.json ]; then
+            echo '{}' > .github/performance-baseline.json
+          fi
+
+      - name: Measure performance
+        id: measure-perf
+        continue-on-error: true
+        run: |
+          uv run python tools/performance_metrics.py \
+            --target github-pages \
+            --config .claude/skills/deployment-verification/config.yaml \
+            --baseline-file .github/performance-baseline.json \
+            --output-file performance-metrics.json \
+            --report-file performance-report.md
+
+      - name: Run performance tests
+        continue-on-error: true
+        run: |
+          uv run pytest tests/test_performance.py \
+            -v --tb=short -m "performance and not slow" || true
+
+      - name: Upload performance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-report
+          path: |
+            performance-report.md
+            performance-metrics.json
+          retention-days: 90
+
+      - name: Check for performance regression
+        if: success()
+        continue-on-error: true
+        run: |
+          # ベースラインが空でない場合のみ回帰チェック
+          if [ -s .github/performance-baseline.json ] && [ "$(cat .github/performance-baseline.json)" != "{}" ]; then
+            echo "Checking for performance regression..."
+            # performance_metrics.pyが既に回帰チェックを行っている
+          else
+            echo "No baseline available, skipping regression check"
+          fi
+
+  summary:
+    name: Verification Summary
+    runs-on: ubuntu-latest
+    needs: [verify-github-pages, verify-docker, measure-performance]
+    if: always()
+
+    steps:
+      - name: Summary
+        run: |
+          echo "## Deployment Verification Summary"
+          echo ""
+          echo "GitHub Pages: ${{ needs.verify-github-pages.result }}"
+          echo "Docker: ${{ needs.verify-docker.result }}"
+          echo "Performance: ${{ needs.measure-performance.result }}"

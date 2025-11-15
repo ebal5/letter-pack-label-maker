@@ -154,13 +154,13 @@ class SectionHeightConfig(BaseModel):
     """セクション高さ設定（実測値ベース）"""
 
     to_section_height: float = Field(
-        default=69, gt=0, le=200, description="お届け先セクションの高さ (mm)。実測値68mm"
+        default=69, gt=0, le=200, description="お届け先セクションの高さ (mm)"
     )
     from_section_height: float = Field(
-        default=53, gt=0, le=200, description="ご依頼主セクションの高さ (mm)。実測値52mm"
+        default=53, gt=0, le=200, description="ご依頼主セクションの高さ (mm)"
     )
     divider_line_width: float = Field(
-        default=1, gt=0, le=10, description="区切り線の太さ (mm)。実測値1mm"
+        default=2.5, gt=0, le=10, description="区切り線の太さ (pt)"
     )
     from_section_font_scale: float = Field(
         default=0.7,
@@ -445,11 +445,10 @@ class LabelGenerator:
         # セクション高さを設定から取得（実測値ベース）
         to_section_height = self.config.section_height.to_section_height * mm
         from_section_height = self.config.section_height.from_section_height * mm
-        divider_line_width = self.config.section_height.divider_line_width * mm
 
-        # 区切り線
+        # 区切り線（太さは設定から取得）
         c.setStrokeColorRGB(0, 0, 0)  # 黒に戻す
-        c.setLineWidth(divider_line_width)
+        c.setLineWidth(self.config.section_height.divider_line_width)
         # 区切り線の位置はご依頼主セクションの上端
         divider_y = y_offset + from_section_height
         c.line(x_offset, divider_y, x_offset + label_width, divider_y)

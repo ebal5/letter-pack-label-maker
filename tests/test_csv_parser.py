@@ -2,6 +2,7 @@
 CSVパーサーのテスト
 """
 
+import logging
 import os
 import tempfile
 
@@ -284,6 +285,34 @@ def test_parse_csv_with_empty_phone_fields():
         # 2件目：空白のみの電話番号もNoneに変換される
         assert labels[1].to_address.phone is None
         assert labels[1].from_address.phone is None
+
+    finally:
+        if os.path.exists(csv_path):
+            os.remove(csv_path)
+
+
+def test_parse_csv_with_unknown_columns(caplog):
+    """不明なカラムが存在する場合のloggingテスト（Issue #75対応）"""
+    csv_content = """to_postal,to_address1,to_address2,to_address3,to_name,to_phone,to_honorific,from_postal,from_address1,from_address2,from_address3,from_name,from_phone,from_honorific,unknown_column,another_unknown
+123-4567,東京都渋谷区XXX 1-2-3,,,山田太郎,03-1234-5678,様,987-6543,大阪府大阪市YYY 4-5-6,,,田中花子,06-9876-5432,,value1,value2
+"""
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".csv", encoding="utf-8") as f:
+        f.write(csv_content)
+        csv_path = f.name
+
+    try:
+        # loggingモジュールの出力をキャプチャ
+        with caplog.at_level(logging.WARNING):
+            labels = parse_csv(csv_path)
+
+        # 正常にパースされることを確認
+        assert len(labels) == 1
+        assert labels[0].to_address.name == "山田太郎"
+
+        # 不明なカラムについての警告ログが出力されていることを確認
+        warning_messages = [record.message for record in caplog.records if record.levelname == "WARNING"]
+        assert any("不明なカラム" in msg and "unknown_column" in msg and "another_unknown" in msg for msg in warning_messages)
 
     finally:
         if os.path.exists(csv_path):
